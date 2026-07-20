@@ -1,5 +1,13 @@
 import { cookies } from 'next/headers'
 import { adminAuth, adminDb } from '@/lib/firebase-admin'
+import { isViewMode, VIEW_MODE_COOKIE, type ViewMode } from '@/lib/view-mode'
+
+/** 쿠키에서 체험 모드를 읽는다. 서버 전용. */
+async function getViewMode(): Promise<ViewMode> {
+  const store = await cookies()
+  const raw = store.get(VIEW_MODE_COOKIE)?.value
+  return isViewMode(raw) ? raw : 'superadmin'
+}
 
 export type CurrentUser = {
   uid: string
@@ -7,10 +15,68 @@ export type CurrentUser = {
   email: string | null
   photoURL: string | null
   communities: { id: string; name: string; communityType: string; regionName: string }[]
-  /** 전역 역할. 슈퍼관리자는 모든 공동체의 가입 신청을 승인할 수 있다. */
+  /**
+   * 체험 모드가 적용된 역할. 권한 판정은 항상 이 값을 쓴다.
+   * 슈퍼관리자가 회장/회원 모드를 켜면 그에 맞게 낮아진다.
+   */
   role: 'superadmin' | 'user'
-  /** 회장으로 지정된 공동체 id 목록. 해당 공동체의 가입 신청만 승인할 수 있다. */
+  /** 체험 모드가 적용된 회장 공동체 목록. */
   adminCommunities: string[]
+  /** DB에 저장된 실제 역할. 모드 전환 권한 검사에만 사용한다. */
+  realRole: 'superadmin' | 'user'
+  /** DB에 저장된 실제 회장 공동체 목록. */
+  realAdminCommunities: string[]
+  /** 현재 체험 모드. 슈퍼관리자가 아니면 항상 'superadmin'(=무효)로 취급하지 않고 무시된다. */
+  viewMode: ViewMode
+}
+
+/**
+ * 실제 권한에 체험 모드를 적용해 "적용 권한"을 계산한다.
+ * 슈퍼관리자가 아닌 사용자에게는 모드가 아무 영향을 주지 않는다.
+ */
+function applyViewMode(
+  realRole: 'superadmin' | 'user',
+  realAdminCommunities: string[],
+  viewMode: ViewMode
+) {
+  if (realRole !== 'superadmin') {
+    return {
+      role: realRole,
+      adminCommunities: realAdminCommunities,
+      realRole,
+      realAdminCommunities,
+      viewMode: 'superadmin' as ViewMode,
+    }
+  }
+
+  switch (viewMode) {
+    case 'member':
+      // 일반 회원 시점 — 승인 권한 없음
+      return {
+        role: 'user' as const,
+        adminCommunities: [],
+        realRole,
+        realAdminCommunities,
+        viewMode,
+      }
+    case 'leader':
+      // 회장 시점 — 담당 공동체만 승인 가능
+      return {
+        role: 'user' as const,
+        adminCommunities: realAdminCommunities,
+        realRole,
+        realAdminCommunities,
+        viewMode,
+      }
+    default:
+      return {
+        role: realRole,
+        adminCommunities: realAdminCommunities,
+        realRole,
+        realAdminCommunities,
+        viewMode: 'superadmin' as ViewMode,
+      }
+  }
 }
 
 export async function getCurrentUser(): Promise<CurrentUser | null> {
@@ -46,8 +112,11 @@ export async function getCurrentUser(): Promise<CurrentUser | null> {
       email: userData.email || null,
       photoURL: userData.photoURL || null,
       communities,
-      role: userData.role === 'superadmin' ? 'superadmin' : 'user',
-      adminCommunities: userData.adminCommunities || [],
+      ...applyViewMode(
+        userData.role === 'superadmin' ? 'superadmin' : 'user',
+        userData.adminCommunities || [],
+        await getViewMode()
+      ),
     }
   } catch {
     return null

@@ -1,8 +1,10 @@
 'use client'
 
+import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { LogOut, Plus, MapPin, Megaphone, Building2, Smile, ChevronRight, UserCheck } from 'lucide-react'
+import { LogOut, Plus, MapPin, Megaphone, Building2, Smile, ChevronRight, UserCheck, PlusCircle } from 'lucide-react'
+import { ViewModeSwitcher } from '@/components/view-mode-switcher'
 import { AppShell } from '@/components/app-shell'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
@@ -14,8 +16,21 @@ import { toast } from 'sonner'
 export default function MePage() {
   const router = useRouter()
   const { user, communities, signOut } = useAuth()
-  const canManageMembers =
-    user?.role === 'superadmin' || (user?.adminCommunities?.length ?? 0) > 0
+  // 체험 모드가 반영된 권한은 서버만 알고 있으므로 API로 받아온다.
+  const [canManageMembers, setCanManageMembers] = useState(false)
+  const [isSuperadmin, setIsSuperadmin] = useState(false)
+
+  useEffect(() => {
+    if (!user) return
+    fetch('/api/view-mode')
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        if (!d) return
+        setCanManageMembers(!!d.canManageMembers)
+        setIsSuperadmin(d.role === 'superadmin')
+      })
+      .catch(() => {})
+  }, [user])
 
   async function handleLogout() {
     await fetch('/api/auth/session', { method: 'DELETE' })
@@ -118,6 +133,18 @@ export default function MePage() {
             <Building2 className="h-5 w-5 text-muted-foreground" />
             <span className="text-sm font-medium">빈집소개</span>
           </Link>
+
+          <ViewModeSwitcher />
+
+          {isSuperadmin && (
+            <Link
+              href="/app/admin/communities/new"
+              className="flex items-center gap-3 rounded-2xl border border-primary/40 bg-primary/5 p-3 transition-colors hover:bg-primary/10"
+            >
+              <PlusCircle className="h-5 w-5 text-primary" />
+              <span className="text-sm font-medium">새 마을 만들기</span>
+            </Link>
+          )}
 
           {canManageMembers && (
             <Link
