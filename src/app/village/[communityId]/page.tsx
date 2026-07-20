@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
-import { Calendar, Home as HomeIcon, MapPin, Users, Sparkles, Camera, Gamepad2, ArrowRight, Building2 } from 'lucide-react'
+import { Calendar, Home as HomeIcon, MapPin, Users, Sparkles, Camera, Gamepad2, ArrowRight, Building2, Clock } from 'lucide-react'
 import { adminDb } from '@/lib/firebase-admin'
 import { getCurrentUser } from '@/lib/session'
 import { ThemeToggle } from '@/components/theme-toggle'
@@ -120,6 +120,7 @@ export default async function VillageHomePage({
           exifLng: photoDoc.exifLng ?? null,
           exifDevice: photoDoc.exifDevice ?? null,
           exifLens: photoDoc.exifLens ?? null,
+          exifAddress: photoDoc.exifAddress ?? null,
           aiCaption: photoDoc.aiCaption ?? null,
         })
       }
@@ -164,6 +165,15 @@ export default async function VillageHomePage({
     .where('status', '==', '게시중')
     .get()
   const vacantCount = vacantSnap.size
+
+  const historySnap = await adminDb
+    .collection('villageHistory')
+    .where('communityId', '==', communityId)
+    .orderBy('date', 'desc')
+    .limit(1)
+    .get()
+  const historyCount = historySnap.size
+  const latestHistory = historySnap.empty ? null : historySnap.docs[0].data()
 
   return (
     <div className="flex min-h-screen flex-col bg-background">
@@ -224,6 +234,22 @@ export default async function VillageHomePage({
           </Link>
         )}
 
+        <Link
+          href={`/village/${communityId}/history`}
+          className="mt-3 flex items-center gap-3 rounded-2xl border border-border bg-card p-3 transition-colors hover:bg-muted/40"
+        >
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/15">
+            <Clock className="h-5 w-5 text-primary-foreground/70" />
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-semibold">마을 히스토리</p>
+            <p className="truncate text-xs text-muted-foreground">
+              {latestHistory ? latestHistory.title : 'AI가 기록한 마을 역사'}
+            </p>
+          </div>
+          <ArrowRight className="h-4 w-4 shrink-0 text-muted-foreground" />
+        </Link>
+
         <section className="mt-5">
           <div className="mb-2 flex items-center justify-between">
             <h2 className="flex items-center gap-1.5 text-base font-bold">
@@ -253,6 +279,7 @@ export default async function VillageHomePage({
                         lng: p.exifLng,
                         device: p.exifDevice,
                         lens: p.exifLens,
+                        location: p.exifAddress ?? null,
                       }}
                       uploaderName={p.uploaderName}
                     />

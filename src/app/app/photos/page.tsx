@@ -27,7 +27,7 @@ export default async function PhotosPage({
     .doc(activeId)
     .collection('photos')
     .orderBy('createdAt', 'desc')
-    .limit(100)
+    .limit(30)
     .get()
 
   const serialized = photosSnap.docs.map((doc) => {
@@ -46,6 +46,7 @@ export default async function PhotosPage({
       exifLng: p.exifLng ?? null,
       exifDevice: p.exifDevice ?? null,
       exifLens: p.exifLens ?? null,
+      exifAddress: p.exifAddress ?? null,
       aiTags,
       aiCaption: p.aiCaption ?? null,
       createdAt: p.createdAt?.toDate?.()?.toISOString?.() ?? new Date().toISOString(),

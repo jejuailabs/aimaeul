@@ -2,7 +2,7 @@
 
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { LogOut, Plus, MapPin, Megaphone, Building2, ChevronRight } from 'lucide-react'
+import { LogOut, Plus, MapPin, Megaphone, Building2, Smile, ChevronRight } from 'lucide-react'
 import { AppShell } from '@/components/app-shell'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
@@ -115,6 +115,14 @@ export default function MePage() {
           >
             <Building2 className="h-5 w-5 text-muted-foreground" />
             <span className="text-sm font-medium">빈집소개</span>
+          </Link>
+
+          <Link
+            href="/app/emoji-packs"
+            className="flex items-center gap-3 rounded-2xl border border-border bg-card p-3 transition-colors hover:bg-muted/40"
+          >
+            <Smile className="h-5 w-5 text-muted-foreground" />
+            <span className="text-sm font-medium">이모티콘 팩 관리</span>
           </Link>
         </section>
 

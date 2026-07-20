@@ -1,6 +1,7 @@
 import { notFound, redirect } from 'next/navigation'
 import { getCurrentUser } from '@/lib/session'
 import { adminDb } from '@/lib/firebase-admin'
+import { FieldValue } from 'firebase-admin/firestore'
 import { ChatRoomClient } from './chat-room-client'
 import type { PhotoData } from '@/components/message-bubble'
 
@@ -18,6 +19,15 @@ export default async function ChatRoomPage({
   const commDoc = await adminDb.collection('communities').doc(communityId).get()
   if (!commDoc.exists) notFound()
   const community = commDoc.data()!
+
+  // Save the user's last read position for unread badge tracking
+  adminDb
+    .collection('users')
+    .doc(user.uid)
+    .collection('readPositions')
+    .doc(communityId)
+    .set({ lastReadAt: FieldValue.serverTimestamp() }, { merge: true })
+    .catch(() => { /* best-effort, don't block page render */ })
 
   const isMember = user.communities.some((c) => c.id === communityId)
   if (!isMember) redirect('/app/chat')
@@ -71,6 +81,7 @@ export default async function ChatRoomPage({
         exifLng: p.exifLng ?? null,
         exifDevice: p.exifDevice ?? null,
         exifLens: p.exifLens ?? null,
+        exifAddress: p.exifAddress ?? null,
         aiCaption: p.aiCaption ?? null,
       }
     }

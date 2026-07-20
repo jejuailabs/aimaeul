@@ -17,6 +17,7 @@ export type PhotoData = {
   exifLng?: number | null
   exifDevice?: string | null
   exifLens?: string | null
+  exifAddress?: string | null
   aiCaption?: string | null
 }
 
@@ -48,6 +49,7 @@ function photoExif(p?: PhotoData | null): ExifData {
     lng: p.exifLng,
     device: p.exifDevice,
     lens: p.exifLens,
+    location: p.exifAddress ?? null,
   }
 }
 
@@ -72,7 +74,12 @@ export function MessageBubble({ message, mine, photo, compact }: Props) {
           {!mine && !compact && (
             <span className="mb-0.5 px-1 text-xs text-muted-foreground">{message.authorName}</span>
           )}
-          <div className="text-6xl leading-none">{message.emojiUrl}</div>
+          {message.emojiUrl?.startsWith('http') ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={message.emojiUrl} alt="이모티콘" className="h-20 w-20 object-contain" />
+          ) : (
+            <div className="text-6xl leading-none">{message.emojiUrl}</div>
+          )}
           <span className={cn('mt-1 px-1 text-[10px] text-muted-foreground', mine && 'text-right')}>
             {formatKoreanTime(message.createdAt)}
           </span>

@@ -9,9 +9,21 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
+import { useAuth } from '@/lib/auth-context'
+import { doc, updateDoc } from 'firebase/firestore'
+import { firestore } from '@/lib/firebase'
 
 export function ThemeToggle({ compact = false }: { compact?: boolean }) {
   const { setTheme, theme } = useTheme()
+  const { user } = useAuth()
+
+  function handleSetTheme(t: string) {
+    setTheme(t)
+    if (user) {
+      updateDoc(doc(firestore, 'users', user.uid), { themePreference: t }).catch(() => {})
+    }
+  }
+
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
@@ -27,15 +39,15 @@ export function ThemeToggle({ compact = false }: { compact?: boolean }) {
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
-        <DropdownMenuItem onClick={() => setTheme('light')}>
+        <DropdownMenuItem onClick={() => handleSetTheme('light')}>
           <Sun className="mr-2 h-4 w-4" /> 밝게
           {theme === 'light' && <span className="ml-auto">✓</span>}
         </DropdownMenuItem>
-        <DropdownMenuItem onClick={() => setTheme('dark')}>
+        <DropdownMenuItem onClick={() => handleSetTheme('dark')}>
           <Moon className="mr-2 h-4 w-4" /> 어둡게
           {theme === 'dark' && <span className="ml-auto">✓</span>}
         </DropdownMenuItem>
-        <DropdownMenuItem onClick={() => setTheme('system')}>
+        <DropdownMenuItem onClick={() => handleSetTheme('system')}>
           <Monitor className="mr-2 h-4 w-4" /> 시스템
           {theme === 'system' && <span className="ml-auto">✓</span>}
         </DropdownMenuItem>

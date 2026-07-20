@@ -36,6 +36,20 @@ export default async function ChatListPage() {
 
       const lastMsg = messagesSnap.docs[0]?.data() ?? null
 
+      // Check unread: compare last message time with user's last read position
+      let hasUnread = false
+      if (lastMsg?.createdAt) {
+        const readPosDoc = await adminDb
+          .collection('users')
+          .doc(user.uid)
+          .collection('readPositions')
+          .doc(c.id)
+          .get()
+        const lastReadAt = readPosDoc.data()?.lastReadAt?.toDate?.() ?? null
+        const lastMsgAt = lastMsg.createdAt?.toDate?.() ?? new Date()
+        hasUnread = !lastReadAt || lastMsgAt > lastReadAt
+      }
+
       return {
         id: c.id,
         name: c.name,
@@ -43,6 +57,7 @@ export default async function ChatListPage() {
         regionName: c.regionName,
         coverImageUrl: commData.coverImageUrl ?? null,
         memberCount: membersSnap.size,
+        hasUnread,
         lastMessage: lastMsg
           ? {
               type: lastMsg.type,
@@ -114,6 +129,12 @@ export default async function ChatListPage() {
                       <div className="flex min-w-0 items-center gap-1.5">
                         <h3 className="truncate font-semibold">{r.name}</h3>
                         <CommunityBadge type={r.communityType} size="sm" />
+                        {r.hasUnread && (
+                          <span
+                            className="inline-block h-2.5 w-2.5 shrink-0 rounded-full bg-red-500"
+                            aria-label="읽지 않은 메시지"
+                          />
+                        )}
                       </div>
                       {last && (
                         <span className="shrink-0 text-[11px] text-muted-foreground">

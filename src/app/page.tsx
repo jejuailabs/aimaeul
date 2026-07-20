@@ -1,9 +1,10 @@
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
-import { LogIn, MapPin, Sparkles, MessageCircle, Camera } from 'lucide-react'
+import { LogIn, MapPin, Sparkles, MessageCircle, Camera, Search } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { ThemeToggle } from '@/components/theme-toggle'
 import { KoreaVillageMap } from '@/components/korea-village-map'
+import { SearchBar } from '@/components/search-bar'
 import { getCurrentUser } from '@/lib/session'
 import { adminDb } from '@/lib/firebase-admin'
 
@@ -63,6 +64,7 @@ export default async function Home() {
             </div>
           </Link>
           <div className="flex items-center gap-2">
+            <SearchBar communities={publicCommunities} />
             <ThemeToggle compact />
             <Button asChild size="sm" className="rounded-full">
               <Link href="/login">

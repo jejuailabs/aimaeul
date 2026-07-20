@@ -82,8 +82,26 @@ export function useChatSocket(
       authorPhotoURL?: string | null
     } & SendPayload) => {
       if (!communityId) return
+
+      const optimisticId = `optimistic_${Date.now()}_${Math.random().toString(36).slice(2)}`
+      const optimisticMsg: ChatMessage = {
+        id: optimisticId,
+        communityId,
+        authorUid: payload.authorUid,
+        authorName: payload.authorName,
+        authorPhotoURL: payload.authorPhotoURL ?? null,
+        type: payload.type ?? 'text',
+        text: payload.text ?? null,
+        photoId: payload.photoId ?? null,
+        emojiUrl: payload.emojiUrl ?? null,
+        gameResultPayload: payload.gameResultPayload ?? null,
+        createdAt: new Date().toISOString(),
+      }
+
+      setMessages((prev) => [...prev, optimisticMsg])
+
       try {
-        await fetch('/api/messages/send', {
+        const res = await fetch('/api/messages/send', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -95,8 +113,16 @@ export function useChatSocket(
             gameResultPayload: payload.gameResultPayload ?? null,
           }),
         })
+        if (!res.ok) {
+          setMessages((prev) => prev.map((m) =>
+            m.id === optimisticId ? { ...m, id: `failed_${optimisticId}` } : m
+          ))
+        }
       } catch (err) {
         console.error('[useChatSocket] send error', err)
+        setMessages((prev) => prev.map((m) =>
+          m.id === optimisticId ? { ...m, id: `failed_${optimisticId}` } : m
+        ))
       }
     },
     [communityId]

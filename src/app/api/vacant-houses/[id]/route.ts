@@ -123,3 +123,27 @@ export async function PATCH(
 
   return NextResponse.json({ ok: true, listing: { id, ...updated.data() } })
 }
+
+export async function DELETE(
+  _req: Request,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const user = await getCurrentUser()
+  if (!user) {
+    return NextResponse.json({ error: '로그인이 필요합니다.' }, { status: 401 })
+  }
+  const { id } = await params
+
+  const doc = await adminDb.collection('vacantHouses').doc(id).get()
+  if (!doc.exists) {
+    return NextResponse.json({ error: '매물을 찾을 수 없습니다.' }, { status: 404 })
+  }
+  const listing = doc.data()!
+  if (listing.posterId !== user.uid) {
+    return NextResponse.json({ error: '삭제 권한이 없습니다.' }, { status: 403 })
+  }
+
+  await adminDb.collection('vacantHouses').doc(id).delete()
+
+  return NextResponse.json({ ok: true })
+}

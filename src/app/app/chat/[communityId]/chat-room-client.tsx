@@ -35,6 +35,13 @@ const EMOJI_SET = [
   '📷','🎨','⚽','🚶','🏕️','🌄','🌅','🌈',
 ]
 
+type EmojiPack = {
+  id: string
+  name: string
+  images: string[]
+  isDefault?: boolean
+}
+
 type Props = {
   community: {
     id: string
@@ -62,6 +69,9 @@ export function ChatRoomClient({
   )
   const [text, setText] = useState('')
   const [uploading, setUploading] = useState(false)
+  const [emojiPacks, setEmojiPacks] = useState<EmojiPack[]>([])
+  const [emojiPacksLoaded, setEmojiPacksLoaded] = useState(false)
+  const [activePackTab, setActivePackTab] = useState<string>('unicode')
   const scrollRef = useRef<HTMLDivElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const meta = communityTypeMeta(community.communityType)
@@ -116,6 +126,18 @@ export function ChatRoomClient({
       type: 'emoji',
       emojiUrl: emoji,
     })
+  }
+
+  async function loadEmojiPacks() {
+    if (emojiPacksLoaded) return
+    try {
+      const res = await fetch(`/api/emoji-packs?communityId=${community.id}`)
+      if (res.ok) {
+        const data = await res.json()
+        setEmojiPacks(data.packs || [])
+      }
+    } catch { /* ignore */ }
+    setEmojiPacksLoaded(true)
   }
 
   return (
@@ -206,7 +228,7 @@ export function ChatRoomClient({
             {uploading ? <Loader2 className="h-5 w-5 animate-spin" /> : <ImagePlus className="h-5 w-5" />}
           </button>
 
-          <Popover>
+          <Popover onOpenChange={(open) => { if (open) loadEmojiPacks() }}>
             <PopoverTrigger asChild>
               <button
                 type="button"
@@ -217,20 +239,62 @@ export function ChatRoomClient({
               </button>
             </PopoverTrigger>
             <PopoverContent className="w-80 p-0" align="start">
-              <div className="border-b border-border px-3 py-2 text-xs font-medium text-muted-foreground">
-                이모티콘
-              </div>
-              <div className="grid max-h-64 grid-cols-8 gap-0.5 overflow-y-auto p-2">
-                {EMOJI_SET.map((emo) => (
+              {/* 탭 헤더 */}
+              <div className="flex items-center gap-0.5 overflow-x-auto border-b border-border px-2 py-1.5">
+                <button
+                  type="button"
+                  onClick={() => setActivePackTab('unicode')}
+                  className={cn(
+                    'shrink-0 rounded-md px-2.5 py-1 text-[11px] font-medium transition-colors',
+                    activePackTab === 'unicode' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:bg-muted'
+                  )}
+                >
+                  기본
+                </button>
+                {emojiPacks.map((pack) => (
                   <button
-                    key={emo}
+                    key={pack.id}
                     type="button"
-                    onClick={() => sendEmoji(emo)}
-                    className="flex h-9 w-9 items-center justify-center rounded-lg text-2xl transition-colors hover:bg-muted"
+                    onClick={() => setActivePackTab(pack.id)}
+                    className={cn(
+                      'shrink-0 rounded-md px-2.5 py-1 text-[11px] font-medium transition-colors',
+                      activePackTab === pack.id ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:bg-muted'
+                    )}
                   >
-                    {emo}
+                    {pack.name}
                   </button>
                 ))}
+              </div>
+              {/* 이모지 그리드 */}
+              <div className="grid max-h-64 grid-cols-8 gap-0.5 overflow-y-auto p-2">
+                {activePackTab === 'unicode' ? (
+                  EMOJI_SET.map((emo) => (
+                    <button
+                      key={emo}
+                      type="button"
+                      onClick={() => sendEmoji(emo)}
+                      className="flex h-9 w-9 items-center justify-center rounded-lg text-2xl transition-colors hover:bg-muted"
+                    >
+                      {emo}
+                    </button>
+                  ))
+                ) : (
+                  emojiPacks
+                    .find((p) => p.id === activePackTab)
+                    ?.images.map((url, i) => (
+                      <button
+                        key={`${activePackTab}-${i}`}
+                        type="button"
+                        onClick={() => sendEmoji(url)}
+                        className="flex h-9 w-9 items-center justify-center rounded-lg transition-colors hover:bg-muted"
+                      >
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src={url} alt="" className="h-7 w-7 object-contain" />
+                      </button>
+                    )) || (
+                    <p className="col-span-8 py-4 text-center text-xs text-muted-foreground">이모티콘이 없어요</p>
+                  )
+                )}
               </div>
             </PopoverContent>
           </Popover>

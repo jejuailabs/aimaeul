@@ -107,6 +107,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         } else {
           const comms = await fetchUserCommunities(firebaseUser.uid)
           setCommunities(comms)
+          const savedTheme = userSnap.data().themePreference
+          if (savedTheme && typeof window !== 'undefined') {
+            const { useTheme } = await import('next-themes')
+            document.documentElement.setAttribute('data-theme', savedTheme === 'system' ? '' : savedTheme)
+            localStorage.setItem('theme', savedTheme)
+          }
         }
       } else {
         setUser(null)
