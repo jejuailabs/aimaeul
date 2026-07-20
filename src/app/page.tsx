@@ -40,8 +40,10 @@ export default async function Home() {
         name: c.name,
         communityType: c.communityType,
         regionName: c.regionName,
-        lat: c.location?.lat ?? null,
-        lng: c.location?.lng ?? null,
+        // Firestore에는 평평한 lat/lng로 저장된다.
+        // 중첩 location을 읽으면 항상 null이 되어 지도에 마커가 하나도 뜨지 않는다.
+        lat: c.lat ?? c.location?.lat ?? null,
+        lng: c.lng ?? c.location?.lng ?? null,
         coverImageUrl: c.coverImageUrl ?? null,
         description: c.description ?? null,
         memberCount: membersSnap.data().count,

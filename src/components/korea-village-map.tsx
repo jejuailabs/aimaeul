@@ -100,6 +100,17 @@ export function KoreaVillageMap({ communities }: { communities: PublicCommunity[
     for (const marker of markersRef.current.values()) marker.remove()
     markersRef.current.clear()
 
+    const missingCoords = filtered.filter(
+      (c) => typeof c.lat !== 'number' || typeof c.lng !== 'number'
+    )
+    if (missingCoords.length > 0) {
+      // 좌표가 없으면 지도에서 조용히 사라져 원인을 찾기 어렵다.
+      console.warn(
+        '[korea-village-map] 좌표가 없어 마커를 표시하지 못한 마을:',
+        missingCoords.map((c) => c.name)
+      )
+    }
+
     for (const c of filtered) {
       if (typeof c.lat !== 'number' || typeof c.lng !== 'number') continue
       const meta = communityTypeMeta(c.communityType)
