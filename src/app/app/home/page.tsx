@@ -2,14 +2,13 @@ import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { Calendar, Camera, ChevronRight, Gamepad2, MapPin, MessageCircle, Users, Building2, Plus } from 'lucide-react'
 import { getCurrentUser } from '@/lib/session'
-import { db } from '@/lib/db'
+import { adminDb } from '@/lib/firebase-admin'
 import { AppShell } from '@/components/app-shell'
 import { CommunityBadge } from '@/components/community-badge'
 import { PhotoWithExif } from '@/components/exif-overlay'
 import { Button } from '@/components/ui/button'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
-import { communityTypeMeta, formatKoreanDate, formatKoreanTime, relativeTime } from '@/lib/village'
-import type { Photo } from '@prisma/client'
+import { communityTypeMeta, formatKoreanDate, formatKoreanTime, relativeTime, toDate } from '@/lib/village'
 
 export const dynamic = 'force-dynamic'
 
@@ -25,31 +24,57 @@ export default async function MemberHomePage({
   const sp = await searchParams
   const activeId = sp.c && user.communities.some((c) => c.id === sp.c) ? sp.c : user.communities[0].id
 
-  const community = await db.community.findUnique({
-    where: { id: activeId },
-    include: { _count: { select: { members: true, photos: true, events: true } } },
-  })
-  if (!community) redirect('/app/home')
+  const communityDoc = await adminDb.collection('communities').doc(activeId).get()
+  if (!communityDoc.exists) redirect('/app/home')
+  const community = communityDoc.data()!
 
-  const [photos, upcomingEvents, recentMessages] = await Promise.all([
-    db.photo.findMany({ where: { communityId: activeId }, orderBy: { createdAt: 'desc' }, take: 6 }),
-    db.event.findMany({ where: { communityId: activeId, startAt: { gte: new Date() } }, orderBy: { startAt: 'asc' }, take: 3 }),
-    db.message.findMany({ where: { communityId: activeId }, orderBy: { createdAt: 'desc' }, take: 5 }),
+  // Get counts
+  const [membersSnap, photosSnap, eventsSnap] = await Promise.all([
+    adminDb.collection('users').where('communityIds', 'array-contains', activeId).count().get(),
+    adminDb.collection('communities').doc(activeId).collection('photos').count().get(),
+    adminDb.collection('communities').doc(activeId).collection('events').count().get(),
+  ])
+  const communityCount = {
+    members: membersSnap.data().count,
+    photos: photosSnap.data().count,
+    events: eventsSnap.data().count,
+  }
+
+  const [photosResult, upcomingEventsResult, recentMessagesResult] = await Promise.all([
+    adminDb
+      .collection('communities').doc(activeId).collection('photos')
+      .orderBy('createdAt', 'desc')
+      .limit(6)
+      .get(),
+    adminDb
+      .collection('communities').doc(activeId).collection('events')
+      .where('startAt', '>=', new Date())
+      .orderBy('startAt', 'asc')
+      .limit(3)
+      .get(),
+    adminDb
+      .collection('communities').doc(activeId).collection('messages')
+      .orderBy('createdAt', 'desc')
+      .limit(5)
+      .get(),
   ])
 
+  const photos = photosResult.docs.map((doc) => ({ id: doc.id, ...doc.data() }))
+  const upcomingEvents = upcomingEventsResult.docs.map((doc) => ({ id: doc.id, ...doc.data() }))
+  const recentMessages = recentMessagesResult.docs.map((doc) => ({ id: doc.id, ...doc.data() }))
+
   const recentGameResults = recentMessages
-    .filter((m) => m.type === 'game_result')
+    .filter((m: any) => m.type === 'game_result')
     .slice(0, 2)
-    .map((m) => ({
+    .map((m: any) => ({
       ...m,
       payload:
         m.gameResultPayload && m.gameResultPayload !== 'null'
-          ? JSON.parse(m.gameResultPayload)
+          ? (typeof m.gameResultPayload === 'string' ? JSON.parse(m.gameResultPayload) : m.gameResultPayload)
           : null,
     }))
 
   const meta = communityTypeMeta(community.communityType)
-  const photoMap = new Map<string, Photo>(photos.map((p) => [p.id, p]))
 
   return (
     <AppShell title="마을홈">
@@ -88,7 +113,7 @@ export default async function MemberHomePage({
             <div className="mb-1 flex items-center gap-2">
               <CommunityBadge type={community.communityType} size="sm" />
               <span className="inline-flex items-center gap-0.5 text-xs">
-                <Users className="h-3 w-3" /> {community._count.members}
+                <Users className="h-3 w-3" /> {communityCount.members}
               </span>
             </div>
             <h2 className="text-lg font-black">{community.name}</h2>
@@ -128,19 +153,22 @@ export default async function MemberHomePage({
               </h3>
             </div>
             <div className="space-y-2">
-              {upcomingEvents.map((ev) => (
-                <div key={ev.id} className="flex items-start gap-3 rounded-2xl border border-border bg-card p-3">
-                  <div className="flex h-11 w-11 shrink-0 flex-col items-center justify-center rounded-xl bg-primary/15">
-                    <span className="text-[9px] font-medium text-muted-foreground">{formatKoreanDate(ev.startAt).split(' ')[1]}</span>
-                    <span className="text-base font-black leading-none">{ev.startAt.getDate()}</span>
+              {upcomingEvents.map((ev: any) => {
+                const startDate = toDate(ev.startAt)
+                return (
+                  <div key={ev.id} className="flex items-start gap-3 rounded-2xl border border-border bg-card p-3">
+                    <div className="flex h-11 w-11 shrink-0 flex-col items-center justify-center rounded-xl bg-primary/15">
+                      <span className="text-[9px] font-medium text-muted-foreground">{formatKoreanDate(startDate).split(' ')[1]}</span>
+                      <span className="text-base font-black leading-none">{startDate.getDate()}</span>
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-semibold">{ev.title}</p>
+                      {ev.location && <p className="text-xs text-muted-foreground">{ev.location}</p>}
+                      <p className="text-[11px] text-muted-foreground">{formatKoreanTime(startDate)}</p>
+                    </div>
                   </div>
-                  <div className="min-w-0 flex-1">
-                    <p className="text-sm font-semibold">{ev.title}</p>
-                    {ev.location && <p className="text-xs text-muted-foreground">{ev.location}</p>}
-                    <p className="text-[11px] text-muted-foreground">{formatKoreanTime(ev.startAt)}</p>
-                  </div>
-                </div>
-              ))}
+                )
+              })}
             </div>
           </section>
         )}
@@ -161,12 +189,12 @@ export default async function MemberHomePage({
             </div>
           ) : (
             <div className="grid grid-cols-3 gap-1.5">
-              {photos.slice(0, 6).map((p) => (
+              {photos.slice(0, 6).map((p: any) => (
                 <PhotoWithExif
                   key={p.id}
-                  src={p.thumbnailUrl}
+                  src={p.thumbnailUrl || p.storageUrl}
                   alt={p.aiCaption || p.uploaderName}
-                  exif={{ takenAt: p.exifTakenAt, device: p.exifDevice }}
+                  exif={{ takenAt: p.exif?.takenAt ?? p.exifTakenAt, device: p.exif?.deviceModel ?? p.exifDevice }}
                   rounded
                   className="aspect-square"
                 />
@@ -182,7 +210,7 @@ export default async function MemberHomePage({
               <Gamepad2 className="h-4 w-4 text-primary" /> 최근 게임 결과
             </h3>
             <div className="space-y-2">
-              {recentGameResults.map((g) => (
+              {recentGameResults.map((g: any) => (
                 <div key={g.id} className="rounded-2xl border border-border bg-card p-3">
                   <p className="text-[11px] text-muted-foreground">{g.payload?.gameType}</p>
                   <p className="text-sm font-semibold">{g.payload?.title}</p>

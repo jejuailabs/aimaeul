@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button'
 import { ThemeToggle } from '@/components/theme-toggle'
 import { KoreaVillageMap } from '@/components/korea-village-map'
 import { getCurrentUser } from '@/lib/session'
-import { db } from '@/lib/db'
+import { adminDb } from '@/lib/firebase-admin'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
@@ -20,23 +20,33 @@ export default async function Home() {
     redirect('/onboarding')
   }
 
-  const communities = await db.community.findMany({
-    where: { isPublic: true },
-    include: { _count: { select: { members: true } } },
-    orderBy: { createdAt: 'asc' },
-  })
+  const commSnap = await adminDb
+    .collection('communities')
+    .where('isPublic', '==', true)
+    .orderBy('createdAt', 'asc')
+    .get()
 
-  const publicCommunities = communities.map((c) => ({
-    id: c.id,
-    name: c.name,
-    communityType: c.communityType,
-    regionName: c.regionName,
-    lat: c.lat,
-    lng: c.lng,
-    coverImageUrl: c.coverImageUrl,
-    description: c.description,
-    memberCount: c._count.members,
-  }))
+  const publicCommunities = await Promise.all(
+    commSnap.docs.map(async (doc) => {
+      const c = doc.data()
+      const membersSnap = await adminDb
+        .collection('users')
+        .where('communityIds', 'array-contains', doc.id)
+        .count()
+        .get()
+      return {
+        id: doc.id,
+        name: c.name,
+        communityType: c.communityType,
+        regionName: c.regionName,
+        lat: c.location?.lat ?? null,
+        lng: c.location?.lng ?? null,
+        coverImageUrl: c.coverImageUrl ?? null,
+        description: c.description ?? null,
+        memberCount: membersSnap.data().count,
+      }
+    })
+  )
 
   return (
     <div className="flex min-h-screen flex-col">
@@ -117,7 +127,7 @@ export default async function Home() {
       <footer className="mt-auto border-t border-border/60 bg-muted/30">
         <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-2 px-4 py-5 text-xs text-muted-foreground sm:flex-row">
           <p className="flex items-center gap-1">
-            <MapPin className="h-3.5 w-3.5" /> 우리마을 — 마을 공동체 디지털 플랫폼
+            <MapPin className="h-3.5 w-3.5" /> 우리마을 -- 마을 공동체 디지털 플랫폼
           </p>
           <p>회원가입은 Google 로그인 한 번으로 끝나요.</p>
         </div>

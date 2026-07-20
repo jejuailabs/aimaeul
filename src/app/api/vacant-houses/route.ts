@@ -1,12 +1,10 @@
 import { NextResponse } from 'next/server'
 import { getCurrentUser } from '@/lib/session'
-import { db } from '@/lib/db'
+import { adminDb } from '@/lib/firebase-admin'
+import { FieldValue } from 'firebase-admin/firestore'
 
 export const dynamic = 'force-dynamic'
 
-const ALLOWED_STATUS = new Set(['게시중', '거래완료', '게시중지'])
-
-// POST /api/vacant-houses  { communityId, photos: string[], monthlyRent?, deposit?, description?, lat?, lng? }
 export async function POST(req: Request) {
   const user = await getCurrentUser()
   if (!user) {
@@ -14,15 +12,7 @@ export async function POST(req: Request) {
   }
 
   const body = await req.json().catch(() => ({}))
-  const {
-    communityId,
-    photos,
-    monthlyRent,
-    deposit,
-    description,
-    lat,
-    lng,
-  } = body as {
+  const { communityId, photos, monthlyRent, deposit, description, lat, lng } = body as {
     communityId?: string
     photos?: string[]
     monthlyRent?: number | null
@@ -42,15 +32,11 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: '사진은 최대 20장까지 가능합니다.' }, { status: 400 })
   }
 
-  // 멤버십 검증
-  const member = await db.communityMember.findUnique({
-    where: { communityId_userId: { communityId, userId: user.id } },
-  })
-  if (!member) {
+  const isMember = user.communities.some((c) => c.id === communityId)
+  if (!isMember) {
     return NextResponse.json({ error: '해당 마을의 멤버가 아닙니다.' }, { status: 403 })
   }
 
-  // 가격 검증 (둘 다 null 이면 "가격 협의")
   const rent = typeof monthlyRent === 'number' && !Number.isNaN(monthlyRent) ? monthlyRent : null
   const dep = typeof deposit === 'number' && !Number.isNaN(deposit) ? deposit : null
   if (rent !== null && (rent < 0 || rent > 100000)) {
@@ -65,24 +51,24 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: '설명은 2000자 이내로 입력해주세요.' }, { status: 400 })
   }
 
-  const listing = await db.vacantHouse.create({
-    data: {
-      communityId,
-      posterId: user.id,
-      photos: JSON.stringify(photos),
-      monthlyRent: rent,
-      deposit: dep,
-      description: desc || null,
-      lat: typeof lat === 'number' && !Number.isNaN(lat) ? lat : null,
-      lng: typeof lng === 'number' && !Number.isNaN(lng) ? lng : null,
-      status: '게시중',
-    },
-  })
+  const listingRef = adminDb.collection('vacantHouses').doc()
+  const listingData = {
+    communityId,
+    posterId: user.uid,
+    photos: JSON.stringify(photos),
+    monthlyRent: rent,
+    deposit: dep,
+    description: desc || null,
+    lat: typeof lat === 'number' && !Number.isNaN(lat) ? lat : null,
+    lng: typeof lng === 'number' && !Number.isNaN(lng) ? lng : null,
+    status: '게시중',
+    createdAt: FieldValue.serverTimestamp(),
+  }
+  await listingRef.set(listingData)
 
-  return NextResponse.json({ ok: true, listing })
+  return NextResponse.json({ ok: true, listing: { id: listingRef.id, ...listingData } })
 }
 
-// GET /api/vacant-houses?communityId=xxx — 내가 속한 마을의 빈집 목록
 export async function GET(req: Request) {
   const user = await getCurrentUser()
   if (!user) {
@@ -97,20 +83,30 @@ export async function GET(req: Request) {
     return NextResponse.json({ listings: [] })
   }
 
-  const where = filterCommunityId
-    ? { communityId: filterCommunityId }
-    : { communityId: { in: communityIds } }
+  let q: FirebaseFirestore.Query = adminDb.collection('vacantHouses')
+  if (filterCommunityId) {
+    q = q.where('communityId', '==', filterCommunityId)
+  } else {
+    q = q.where('communityId', 'in', communityIds.slice(0, 10))
+  }
+  q = q.orderBy('createdAt', 'desc').limit(200)
 
-  const listings = await db.vacantHouse.findMany({
-    where,
-    orderBy: { createdAt: 'desc' },
-    include: {
-      community: {
-        select: { id: true, name: true, regionName: true, communityType: true },
-      },
-    },
-    take: 200,
-  })
+  const snap = await q.get()
+  const listings = await Promise.all(
+    snap.docs.map(async (doc) => {
+      const d = doc.data()
+      const commDoc = await adminDb.collection('communities').doc(d.communityId).get()
+      const comm = commDoc.data()
+      return {
+        id: doc.id,
+        ...d,
+        createdAt: d.createdAt?.toDate?.()?.toISOString?.() ?? null,
+        community: comm
+          ? { id: commDoc.id, name: comm.name, regionName: comm.regionName, communityType: comm.communityType }
+          : null,
+      }
+    })
+  )
 
   return NextResponse.json({ listings })
 }

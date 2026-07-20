@@ -1,74 +1,10 @@
-import { db } from '@/lib/db'
-
-/** Public community list for the map (guest-visible). */
-export async function getPublicCommunities() {
-  return db.community.findMany({
-    where: { isPublic: true },
-    select: {
-      id: true,
-      name: true,
-      communityType: true,
-      regionName: true,
-      lat: true,
-      lng: true,
-      coverImageUrl: true,
-      description: true,
-    },
-    orderBy: { createdAt: 'asc' },
-  })
-}
-
-export async function getCommunity(communityId: string) {
-  return db.community.findUnique({
-    where: { id: communityId },
-    include: {
-      _count: {
-        select: { members: true, photos: true, events: true },
-      },
-    },
-  })
-}
-
-export async function getRecentMessages(communityId: string, limit = 50) {
-  return db.message.findMany({
-    where: { communityId },
-    orderBy: { createdAt: 'asc' },
-    take: limit,
-  })
-}
-
-export async function getRecentPhotos(communityId: string, limit = 20) {
-  return db.photo.findMany({
-    where: { communityId },
-    orderBy: { createdAt: 'desc' },
-    take: limit,
-  })
-}
-
-export async function getUpcomingEvents(communityId: string, limit = 5) {
-  const now = new Date()
-  return db.event.findMany({
-    where: { communityId, startAt: { gte: now } },
-    orderBy: { startAt: 'asc' },
-    take: limit,
-  })
-}
-
-export async function getMembers(communityId: string) {
-  return db.communityMember.findMany({
-    where: { communityId },
-    include: { user: { select: { id: true, name: true, photoURL: true } } },
-    orderBy: { joinedAt: 'asc' },
-  })
-}
-
 export const COMMUNITY_TYPE_META: Record<
   string,
   { emoji: string; color: string; label: string }
 > = {
   부녀회: { emoji: '🌸', color: '#FEE500', label: '부녀회' },
   청년회: { emoji: '🌱', color: '#34d399', label: '청년회' },
-  노인회: { emoji: '银杏', color: '#f59e0b', label: '노인회' },
+  노인회: { emoji: '🍂', color: '#f59e0b', label: '노인회' },
   동호회: { emoji: '⛳', color: '#60a5fa', label: '동호회' },
 }
 
@@ -82,8 +18,8 @@ export function communityTypeMeta(type: string) {
   )
 }
 
-export function formatKoreanDate(d: Date | string) {
-  const date = typeof d === 'string' ? new Date(d) : d
+export function formatKoreanDate(d: Date | string | any) {
+  const date = d instanceof Date ? d : d?.toDate ? d.toDate() : new Date(d)
   return date.toLocaleString('ko-KR', {
     year: 'numeric',
     month: 'long',
@@ -91,16 +27,16 @@ export function formatKoreanDate(d: Date | string) {
   })
 }
 
-export function formatKoreanTime(d: Date | string) {
-  const date = typeof d === 'string' ? new Date(d) : d
+export function formatKoreanTime(d: Date | string | any) {
+  const date = d instanceof Date ? d : d?.toDate ? d.toDate() : new Date(d)
   return date.toLocaleTimeString('ko-KR', {
     hour: '2-digit',
     minute: '2-digit',
   })
 }
 
-export function relativeTime(d: Date | string) {
-  const date = typeof d === 'string' ? new Date(d) : d
+export function relativeTime(d: Date | string | any) {
+  const date = d instanceof Date ? d : d?.toDate ? d.toDate() : new Date(d)
   const diff = Date.now() - date.getTime()
   const min = Math.floor(diff / 60000)
   if (min < 1) return '방금'
@@ -118,4 +54,15 @@ export function formatRent(rent: number | null, deposit: number | null) {
   if (rent != null) parts.push(`월세 ${rent.toLocaleString()}만`)
   if (parts.length === 0) return '가격 협의'
   return parts.join(' / ')
+}
+
+export function toDate(d: any): Date {
+  if (d instanceof Date) return d
+  if (d?.toDate) return d.toDate()
+  if (d?.seconds) return new Date(d.seconds * 1000)
+  return new Date(d)
+}
+
+export function toISOString(d: any): string {
+  return toDate(d).toISOString()
 }

@@ -1,26 +1,20 @@
 'use client'
 
 import Link from 'next/link'
-import { MessageCircle, Lock, Loader2 } from 'lucide-react'
+import { MessageCircle, Lock } from 'lucide-react'
 import { useChatSocket, type ChatMessage } from '@/hooks/use-chat-socket'
-import { MessageBubble } from '@/components/message-bubble'
+import { MessageBubble, type PhotoData } from '@/components/message-bubble'
 import { Button } from '@/components/ui/button'
-import type { Photo } from '@prisma/client'
 
 type Props = {
   communityId: string
   initialMessages: ChatMessage[]
-  photoMap: Map<string, Photo>
+  photoMap: Map<string, PhotoData>
   communityName: string
   readOnly?: boolean
   loggedIn?: boolean
 }
 
-/**
- * 마을 홈페이지 Live Chat 영역 (05 문서).
- * 회원 채팅 앱과 동일 socket room 구독 → 실시간 반영.
- * 비회원(readOnly)은 읽기 전용.
- */
 export function LiveChatPanel({
   communityId,
   initialMessages,

@@ -6,11 +6,23 @@ import { cn } from '@/lib/utils'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { PhotoWithExif, type ExifData } from '@/components/exif-overlay'
 import { formatKoreanTime, relativeTime } from '@/lib/village'
-import type { Photo } from '@prisma/client'
+
+export type PhotoData = {
+  id: string
+  storageUrl: string
+  thumbnailUrl: string
+  uploaderName?: string
+  exifTakenAt?: any
+  exifLat?: number | null
+  exifLng?: number | null
+  exifDevice?: string | null
+  exifLens?: string | null
+  aiCaption?: string | null
+}
 
 export type ChatMessageLike = {
   id: string
-  authorId: string
+  authorUid: string
   authorName: string
   authorPhotoURL?: string | null
   type: string
@@ -18,17 +30,17 @@ export type ChatMessageLike = {
   photoId?: string | null
   emojiUrl?: string | null
   gameResultPayload?: any | null
-  createdAt: Date | string
+  createdAt: Date | string | any
 }
 
 type Props = {
   message: ChatMessageLike
   mine: boolean
-  photo?: Photo | null
-  compact?: boolean // homepage live chat: smaller bubbles
+  photo?: PhotoData | null
+  compact?: boolean
 }
 
-function photoExif(p?: Photo | null): ExifData {
+function photoExif(p?: PhotoData | null): ExifData {
   if (!p) return {}
   return {
     takenAt: p.exifTakenAt,
@@ -42,7 +54,6 @@ function photoExif(p?: Photo | null): ExifData {
 export function MessageBubble({ message, mine, photo, compact }: Props) {
   const router = useRouter()
 
-  // System message: centered gray pill
   if (message.type === 'system') {
     return (
       <div className="my-2 flex justify-center">
@@ -53,7 +64,6 @@ export function MessageBubble({ message, mine, photo, compact }: Props) {
     )
   }
 
-  // Emoji message: large emoji only, no bubble
   if (message.type === 'emoji') {
     return (
       <div className={cn('flex gap-2', mine ? 'flex-row-reverse' : 'flex-row')}>
@@ -71,7 +81,6 @@ export function MessageBubble({ message, mine, photo, compact }: Props) {
     )
   }
 
-  // Game result: card bubble
   if (message.type === 'game_result') {
     const payload = message.gameResultPayload || {}
     return (
@@ -111,7 +120,6 @@ export function MessageBubble({ message, mine, photo, compact }: Props) {
     )
   }
 
-  // Photo message
   if (message.type === 'photo') {
     if (!photo) {
       return (
@@ -146,7 +154,6 @@ export function MessageBubble({ message, mine, photo, compact }: Props) {
     )
   }
 
-  // Default: text bubble
   return (
     <div className={cn('flex gap-2', mine ? 'flex-row-reverse' : 'flex-row')}>
       {!mine && <AvatarBox name={message.authorName} src={message.authorPhotoURL} compact={compact} />}

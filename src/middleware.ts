@@ -1,7 +1,16 @@
-export { default } from 'next-auth/middleware'
+import { NextResponse } from 'next/server'
+import type { NextRequest } from 'next/server'
+
+export function middleware(request: NextRequest) {
+  const session = request.cookies.get('__session')?.value
+  if (!session) {
+    const loginUrl = new URL('/login', request.url)
+    loginUrl.searchParams.set('callbackUrl', request.nextUrl.pathname)
+    return NextResponse.redirect(loginUrl)
+  }
+  return NextResponse.next()
+}
 
 export const config = {
-  // Protect member-only routes. Public routes (/, /village/*, /login, /onboarding, /api/v1/*)
-  // are intentionally NOT protected so guests and crawlers can read public villages.
   matcher: ['/app/:path*'],
 }

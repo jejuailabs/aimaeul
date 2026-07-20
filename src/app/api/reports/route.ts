@@ -1,11 +1,10 @@
 import { NextResponse } from 'next/server'
 import { getCurrentUser } from '@/lib/session'
-import { db } from '@/lib/db'
+import { adminDb } from '@/lib/firebase-admin'
+import { FieldValue } from 'firebase-admin/firestore'
 
 export const dynamic = 'force-dynamic'
 
-// POST /api/reports  { communityId, description, photoUrl? }
-// 제보 생성 — 회원 + 멤버십 필요. status "접수".
 export async function POST(req: Request) {
   const user = await getCurrentUser()
   if (!user) {
@@ -30,55 +29,68 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: '설명은 1000자 이내로 입력해주세요.' }, { status: 400 })
   }
 
-  // 멤버십 검증
-  const member = await db.communityMember.findUnique({
-    where: { communityId_userId: { communityId, userId: user.id } },
-  })
-  if (!member) {
+  const isMember = user.communities.some((c) => c.id === communityId)
+  if (!isMember) {
     return NextResponse.json({ error: '해당 마을의 멤버가 아닙니다.' }, { status: 403 })
   }
 
-  // photoUrl이 있으면 해당 사진의 EXIF도 함께 보존 (report.exifRaw)
   let exifRaw = '{}'
   if (photoUrl) {
-    const photo = await db.photo.findFirst({
-      where: { storageUrl: photoUrl, communityId },
-      select: { exifRaw: true },
-    })
-    if (photo?.exifRaw) exifRaw = photo.exifRaw
+    const photosSnap = await adminDb
+      .collection('communities')
+      .doc(communityId)
+      .collection('photos')
+      .where('storageUrl', '==', photoUrl)
+      .limit(1)
+      .get()
+    if (!photosSnap.empty) {
+      exifRaw = photosSnap.docs[0].data().exifRaw || '{}'
+    }
   }
 
-  const report = await db.report.create({
-    data: {
-      communityId,
-      reporterId: user.id,
-      description: desc,
-      photoUrl: photoUrl ?? null,
-      exifRaw,
-      status: '접수',
-    },
-  })
+  const reportRef = adminDb.collection('reports').doc()
+  const reportData = {
+    communityId,
+    reporterId: user.uid,
+    description: desc,
+    photoUrl: photoUrl ?? null,
+    exifRaw,
+    status: '접수',
+    createdAt: FieldValue.serverTimestamp(),
+  }
+  await reportRef.set(reportData)
 
-  return NextResponse.json({ ok: true, report })
+  return NextResponse.json({ ok: true, report: { id: reportRef.id, ...reportData } })
 }
 
-// GET /api/reports — 내 제보 내역 (본인이 올린 것만)
 export async function GET() {
   const user = await getCurrentUser()
   if (!user) {
     return NextResponse.json({ error: '로그인이 필요합니다.' }, { status: 401 })
   }
 
-  const reports = await db.report.findMany({
-    where: { reporterId: user.id },
-    orderBy: { createdAt: 'desc' },
-    include: {
-      community: {
-        select: { id: true, name: true, regionName: true, communityType: true },
-      },
-    },
-    take: 100,
-  })
+  const reportsSnap = await adminDb
+    .collection('reports')
+    .where('reporterId', '==', user.uid)
+    .orderBy('createdAt', 'desc')
+    .limit(100)
+    .get()
+
+  const reports = await Promise.all(
+    reportsSnap.docs.map(async (doc) => {
+      const d = doc.data()
+      const commDoc = await adminDb.collection('communities').doc(d.communityId).get()
+      const comm = commDoc.data()
+      return {
+        id: doc.id,
+        ...d,
+        createdAt: d.createdAt?.toDate?.()?.toISOString?.() ?? null,
+        community: comm
+          ? { id: commDoc.id, name: comm.name, regionName: comm.regionName, communityType: comm.communityType }
+          : null,
+      }
+    })
+  )
 
   return NextResponse.json({ reports })
 }

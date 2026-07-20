@@ -2,13 +2,12 @@ import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { MessageCircle, Plus, Users, MapPin } from 'lucide-react'
 import { getCurrentUser } from '@/lib/session'
-import { db } from '@/lib/db'
+import { adminDb } from '@/lib/firebase-admin'
 import { AppShell } from '@/components/app-shell'
 import { Button } from '@/components/ui/button'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { CommunityBadge } from '@/components/community-badge'
 import { relativeTime, communityTypeMeta } from '@/lib/village'
-import { ThemeToggle } from '@/components/theme-toggle'
 
 export const dynamic = 'force-dynamic'
 
@@ -17,32 +16,44 @@ export default async function ChatListPage() {
   if (!user) redirect('/login?callbackUrl=/app/chat')
   if (user.communities.length === 0) redirect('/onboarding')
 
-  // 각 커뮤니티의 최근 메시지 1개 + 멤버 수
-  const memberships = await db.communityMember.findMany({
-    where: { userId: user.id },
-    include: {
-      community: {
-        include: {
-          _count: { select: { members: true } },
-          messages: {
-            orderBy: { createdAt: 'desc' },
-            take: 1,
-          },
-        },
-      },
-    },
-    orderBy: { joinedAt: 'asc' },
-  })
+  const rooms = await Promise.all(
+    user.communities.map(async (c) => {
+      const commDoc = await adminDb.collection('communities').doc(c.id).get()
+      const commData = commDoc.data() || {}
 
-  const rooms = memberships.map((m) => ({
-    id: m.community.id,
-    name: m.community.name,
-    communityType: m.community.communityType,
-    regionName: m.community.regionName,
-    coverImageUrl: m.community.coverImageUrl,
-    memberCount: m.community._count.members,
-    lastMessage: m.community.messages[0] ?? null,
-  }))
+      const membersSnap = await adminDb
+        .collection('users')
+        .where('communityIds', 'array-contains', c.id)
+        .get()
+
+      const messagesSnap = await adminDb
+        .collection('communities')
+        .doc(c.id)
+        .collection('messages')
+        .orderBy('createdAt', 'desc')
+        .limit(1)
+        .get()
+
+      const lastMsg = messagesSnap.docs[0]?.data() ?? null
+
+      return {
+        id: c.id,
+        name: c.name,
+        communityType: c.communityType,
+        regionName: c.regionName,
+        coverImageUrl: commData.coverImageUrl ?? null,
+        memberCount: membersSnap.size,
+        lastMessage: lastMsg
+          ? {
+              type: lastMsg.type,
+              text: lastMsg.text ?? null,
+              gameResultPayload: lastMsg.gameResultPayload ?? null,
+              createdAt: lastMsg.createdAt?.toDate?.() ?? new Date(),
+            }
+          : null,
+      }
+    })
+  )
 
   return (
     <AppShell
@@ -71,9 +82,7 @@ export default async function ChatListPage() {
               else if (last.type === 'photo') preview = '📷 사진'
               else if (last.type === 'emoji') preview = '이모티콘'
               else if (last.type === 'game_result') {
-                const p = last.gameResultPayload && last.gameResultPayload !== 'null'
-                  ? JSON.parse(last.gameResultPayload)
-                  : null
+                const p = last.gameResultPayload
                 preview = `🎲 ${p?.title || '게임 결과'}`
               } else preview = last.text || ''
             }

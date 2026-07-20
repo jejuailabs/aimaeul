@@ -1,8 +1,8 @@
 import { notFound, redirect } from 'next/navigation'
 import { getCurrentUser } from '@/lib/session'
-import { db } from '@/lib/db'
+import { adminDb } from '@/lib/firebase-admin'
 import { ChatRoomClient } from './chat-room-client'
-import type { Photo } from '@prisma/client'
+import type { PhotoData } from '@/components/message-bubble'
 
 export const dynamic = 'force-dynamic'
 
@@ -15,53 +15,82 @@ export default async function ChatRoomPage({
   const user = await getCurrentUser()
   if (!user) redirect(`/login?callbackUrl=/app/chat/${communityId}`)
 
-  const community = await db.community.findUnique({ where: { id: communityId } })
-  if (!community) notFound()
+  const commDoc = await adminDb.collection('communities').doc(communityId).get()
+  if (!commDoc.exists) notFound()
+  const community = commDoc.data()!
 
-  const membership = await db.communityMember.findUnique({
-    where: { communityId_userId: { communityId, userId: user.id } },
-  })
-  if (!membership) {
-    redirect('/app/chat')
-  }
+  const isMember = user.communities.some((c) => c.id === communityId)
+  if (!isMember) redirect('/app/chat')
 
-  // 최근 메시지 + 관련 사진
-  const messages = await db.message.findMany({
-    where: { communityId },
-    orderBy: { createdAt: 'asc' },
-    take: 60,
+  const messagesSnap = await adminDb
+    .collection('communities')
+    .doc(communityId)
+    .collection('messages')
+    .orderBy('createdAt', 'asc')
+    .limit(60)
+    .get()
+
+  const messages = messagesSnap.docs.map((doc) => {
+    const d = doc.data()
+    return {
+      id: doc.id,
+      communityId,
+      authorUid: d.authorUid ?? '',
+      authorName: d.authorName ?? '',
+      authorPhotoURL: d.authorPhotoURL ?? null,
+      type: d.type ?? 'text',
+      text: d.text ?? null,
+      photoId: d.photoId ?? null,
+      emojiUrl: d.emojiUrl ?? null,
+      gameResultPayload: d.gameResultPayload ?? null,
+      createdAt: d.createdAt?.toDate?.()?.toISOString?.() ?? new Date().toISOString(),
+    }
   })
+
   const photoIds = messages
     .map((m) => m.photoId)
     .filter((x): x is string => !!x)
-  const photos = photoIds.length
-    ? await db.photo.findMany({ where: { id: { in: photoIds } } })
-    : []
-  const photoMap = new Map<string, Photo>(photos.map((p) => [p.id, p]))
 
-  const initialMessages = messages.map((m) => ({
-    ...m,
-    gameResultPayload:
-      m.gameResultPayload && m.gameResultPayload !== 'null'
-        ? JSON.parse(m.gameResultPayload)
-        : null,
-  }))
+  const photoMap: Record<string, PhotoData> = {}
+  for (const pid of photoIds) {
+    const photoDoc = await adminDb
+      .collection('communities')
+      .doc(communityId)
+      .collection('photos')
+      .doc(pid)
+      .get()
+    if (photoDoc.exists) {
+      const p = photoDoc.data()!
+      photoMap[pid] = {
+        id: photoDoc.id,
+        storageUrl: p.storageUrl ?? '',
+        thumbnailUrl: p.thumbnailUrl ?? '',
+        uploaderName: p.uploaderName ?? undefined,
+        exifTakenAt: p.exifTakenAt?.toDate?.()?.toISOString?.() ?? null,
+        exifLat: p.exifLat ?? null,
+        exifLng: p.exifLng ?? null,
+        exifDevice: p.exifDevice ?? null,
+        exifLens: p.exifLens ?? null,
+        aiCaption: p.aiCaption ?? null,
+      }
+    }
+  }
 
   return (
     <ChatRoomClient
       community={{
-        id: community.id,
-        name: community.name,
-        communityType: community.communityType,
-        regionName: community.regionName,
-        coverImageUrl: community.coverImageUrl,
+        id: communityId,
+        name: community.name ?? '',
+        communityType: community.communityType ?? '',
+        regionName: community.regionName ?? '',
+        coverImageUrl: community.coverImageUrl ?? null,
       }}
       user={{
-        id: user.id,
-        name: user.name,
+        id: user.uid,
+        name: user.displayName,
         photoURL: user.photoURL,
       }}
-      initialMessages={initialMessages}
+      initialMessages={messages}
       photoMap={photoMap}
     />
   )

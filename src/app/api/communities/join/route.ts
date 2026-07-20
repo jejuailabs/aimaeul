@@ -1,11 +1,11 @@
 import { NextResponse } from 'next/server'
 import { getCurrentUser } from '@/lib/session'
-import { db } from '@/lib/db'
+import { adminDb } from '@/lib/firebase-admin'
+import { FieldValue } from 'firebase-admin/firestore'
 import { createMessageAndBroadcast } from '@/lib/broadcast'
 
 export const dynamic = 'force-dynamic'
 
-// POST /api/communities/join  { communityId } 또는 { inviteCode }
 export async function POST(req: Request) {
   const user = await getCurrentUser()
   if (!user) {
@@ -17,24 +17,26 @@ export async function POST(req: Request) {
     inviteCode?: string
   }
 
-  let community = null as null | { id: string; name: string; isPublic: boolean; inviteCode: string }
+  let communityDoc = null as FirebaseFirestore.DocumentSnapshot | null
   if (inviteCode) {
-    community = await db.community.findFirst({
-      where: { inviteCode: inviteCode.trim().toUpperCase() },
-      select: { id: true, name: true, isPublic: true, inviteCode: true },
-    })
+    const snap = await adminDb
+      .collection('communities')
+      .where('inviteCode', '==', inviteCode.trim().toUpperCase())
+      .limit(1)
+      .get()
+    communityDoc = snap.docs[0] ?? null
   } else if (communityId) {
-    community = await db.community.findUnique({
-      where: { id: communityId },
-      select: { id: true, name: true, isPublic: true, inviteCode: true },
-    })
+    const doc = await adminDb.collection('communities').doc(communityId).get()
+    if (doc.exists) communityDoc = doc
   }
 
-  if (!community) {
+  if (!communityDoc || !communityDoc.exists) {
     return NextResponse.json({ error: '마을을 찾을 수 없어요.' }, { status: 404 })
   }
 
-  // 비공개 커뮤니티는 초대코드 필수
+  const community = communityDoc.data()!
+  const cId = communityDoc.id
+
   if (!community.isPublic && !inviteCode) {
     return NextResponse.json(
       { error: '비공개 마을입니다. 초대코드를 입력해주세요.' },
@@ -42,26 +44,25 @@ export async function POST(req: Request) {
     )
   }
 
-  // 이미 가입했는지 확인
-  const existing = await db.communityMember.findUnique({
-    where: { communityId_userId: { communityId: community.id, userId: user.id } },
-  })
-  if (existing) {
-    return NextResponse.json({ ok: true, communityId: community.id, already: true })
+  const userDoc = await adminDb.collection('users').doc(user.uid).get()
+  const userData = userDoc.data() || {}
+  const existingIds: string[] = userData.communityIds || []
+
+  if (existingIds.includes(cId)) {
+    return NextResponse.json({ ok: true, communityId: cId, already: true })
   }
 
-  await db.communityMember.create({
-    data: { communityId: community.id, userId: user.id },
+  await adminDb.collection('users').doc(user.uid).update({
+    communityIds: FieldValue.arrayUnion(cId),
   })
 
-  // 시스템 메시지: "OO님이 참여했습니다"
   await createMessageAndBroadcast({
-    communityId: community.id,
-    authorId: user.id,
+    communityId: cId,
+    authorUid: user.uid,
     authorName: '시스템',
     type: 'system',
-    text: `${user.name}님이 참여했습니다`,
+    text: `${user.displayName}님이 참여했습니다`,
   })
 
-  return NextResponse.json({ ok: true, communityId: community.id })
+  return NextResponse.json({ ok: true, communityId: cId })
 }

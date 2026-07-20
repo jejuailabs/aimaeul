@@ -1,7 +1,7 @@
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { getCurrentUser } from '@/lib/session'
-import { db } from '@/lib/db'
+import { adminDb } from '@/lib/firebase-admin'
 import { GamesClient } from './games-client'
 
 export const dynamic = 'force-dynamic'
@@ -10,7 +10,6 @@ export default async function GamesPage() {
   const user = await getCurrentUser()
   if (!user) redirect('/login?callbackUrl=/app/games')
 
-  // 참여 중인 마을이 없으면 온보딩으로 유도
   if (user.communities.length === 0) {
     return (
       <div className="flex min-h-screen flex-col items-center justify-center gap-4 bg-background px-6 text-center">
@@ -31,18 +30,17 @@ export default async function GamesPage() {
     )
   }
 
-  // 각 마을의 멤버를 미리 불러와 참가자 피커에 prefill
   const communitiesWithMembers = await Promise.all(
     user.communities.map(async (c) => {
-      const members = await db.communityMember.findMany({
-        where: { communityId: c.id },
-        include: { user: { select: { id: true, name: true } } },
-        orderBy: { joinedAt: 'asc' },
-      })
-      return {
-        ...c,
-        members: members.map((m) => ({ id: m.user.id, name: m.user.name })),
-      }
+      const usersSnap = await adminDb
+        .collection('users')
+        .where('communityIds', 'array-contains', c.id)
+        .get()
+      const members = usersSnap.docs.map((d) => ({
+        id: d.id,
+        name: d.data().displayName || '익명',
+      }))
+      return { ...c, members }
     })
   )
 

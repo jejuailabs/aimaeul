@@ -20,11 +20,10 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { useChatSocket, type ChatMessage } from '@/hooks/use-chat-socket'
-import { MessageBubble } from '@/components/message-bubble'
+import { MessageBubble, type PhotoData } from '@/components/message-bubble'
 import { communityTypeMeta, formatKoreanTime } from '@/lib/village'
 import { cn } from '@/lib/utils'
 import { toast } from 'sonner'
-import type { Photo } from '@prisma/client'
 
 const EMOJI_SET = [
   '😀','😂','🥰','😍','😎','🤣','😅','😊',
@@ -46,7 +45,7 @@ type Props = {
   }
   user: { id: string; name: string; photoURL?: string | null }
   initialMessages: ChatMessage[]
-  photoMap: Map<string, Photo>
+  photoMap: Record<string, PhotoData>
 }
 
 export function ChatRoomClient({
@@ -77,7 +76,7 @@ export function ChatRoomClient({
     const t = text.trim()
     if (!t) return
     send({
-      authorId: user.id,
+      authorUid: user.id,
       authorName: user.name,
       authorPhotoURL: user.photoURL,
       type: 'text',
@@ -111,7 +110,7 @@ export function ChatRoomClient({
 
   function sendEmoji(emoji: string) {
     send({
-      authorId: user.id,
+      authorUid: user.id,
       authorName: user.name,
       authorPhotoURL: user.photoURL,
       type: 'emoji',
@@ -169,8 +168,8 @@ export function ChatRoomClient({
             <MessageBubble
               key={m.id}
               message={m}
-              mine={m.authorId === user.id}
-              photo={m.photoId ? photoMap.get(m.photoId) || null : null}
+              mine={m.authorUid === user.id}
+              photo={m.photoId ? photoMap[m.photoId] || null : null}
             />
           ))}
           {typingFrom && typingFrom !== user.name && (

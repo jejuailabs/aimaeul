@@ -1,13 +1,9 @@
 import { NextResponse } from 'next/server'
 import { getCurrentUser } from '@/lib/session'
-import { db } from '@/lib/db'
 import { createMessageAndBroadcast } from '@/lib/broadcast'
 
 export const dynamic = 'force-dynamic'
 
-// POST /api/games/result
-// { communityId, gameType, title, resultSummary, winner? }
-// 게임 결과를 messages 컬렉션에 game_result 타입으로 저장 + 브로드캐스트
 export async function POST(req: Request) {
   const user = await getCurrentUser()
   if (!user) {
@@ -26,18 +22,15 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: '필수 필드가 누락되었습니다.' }, { status: 400 })
   }
 
-  // 멤버십 검증
-  const member = await db.communityMember.findUnique({
-    where: { communityId_userId: { communityId, userId: user.id } },
-  })
-  if (!member) {
+  const isMember = user.communities.some((c) => c.id === communityId)
+  if (!isMember) {
     return NextResponse.json({ error: '해당 마을의 멤버가 아닙니다.' }, { status: 403 })
   }
 
   const msg = await createMessageAndBroadcast({
     communityId,
-    authorId: user.id,
-    authorName: user.name,
+    authorUid: user.uid,
+    authorName: user.displayName,
     authorPhotoURL: user.photoURL,
     type: 'game_result',
     gameResultPayload: {

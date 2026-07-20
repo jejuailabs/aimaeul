@@ -1,7 +1,6 @@
-import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { getCurrentUser } from '@/lib/session'
-import { db } from '@/lib/db'
+import { adminDb } from '@/lib/firebase-admin'
 import { AppShell } from '@/components/app-shell'
 import { PhotosClient } from './photos-client'
 
@@ -19,35 +18,45 @@ export default async function PhotosPage({
   const sp = await searchParams
   const activeId = sp.c && user.communities.some((c) => c.id === sp.c) ? sp.c : user.communities[0].id
 
-  const community = await db.community.findUnique({ where: { id: activeId } })
-  if (!community) redirect('/app/photos')
+  const commDoc = await adminDb.collection('communities').doc(activeId).get()
+  if (!commDoc.exists) redirect('/app/photos')
+  const community = commDoc.data()!
 
-  const photos = await db.photo.findMany({
-    where: { communityId: activeId },
-    orderBy: { createdAt: 'desc' },
-    take: 100,
+  const photosSnap = await adminDb
+    .collection('communities')
+    .doc(activeId)
+    .collection('photos')
+    .orderBy('createdAt', 'desc')
+    .limit(100)
+    .get()
+
+  const serialized = photosSnap.docs.map((doc) => {
+    const p = doc.data()
+    let aiTags: string[] = []
+    try {
+      aiTags = typeof p.aiTags === 'string' ? JSON.parse(p.aiTags) : (p.aiTags ?? [])
+    } catch { /* ignore */ }
+    return {
+      id: doc.id,
+      storageUrl: p.storageUrl ?? '',
+      thumbnailUrl: p.thumbnailUrl ?? '',
+      uploaderName: p.uploaderName ?? '',
+      exifTakenAt: p.exifTakenAt?.toDate?.()?.toISOString?.() ?? null,
+      exifLat: p.exifLat ?? null,
+      exifLng: p.exifLng ?? null,
+      exifDevice: p.exifDevice ?? null,
+      exifLens: p.exifLens ?? null,
+      aiTags,
+      aiCaption: p.aiCaption ?? null,
+      createdAt: p.createdAt?.toDate?.()?.toISOString?.() ?? new Date().toISOString(),
+    }
   })
-
-  const serialized = photos.map((p) => ({
-    id: p.id,
-    storageUrl: p.storageUrl,
-    thumbnailUrl: p.thumbnailUrl,
-    uploaderName: p.uploaderName,
-    exifTakenAt: p.exifTakenAt?.toISOString() ?? null,
-    exifLat: p.exifLat,
-    exifLng: p.exifLng,
-    exifDevice: p.exifDevice,
-    exifLens: p.exifLens,
-    aiTags: JSON.parse(p.aiTags || '[]') as string[],
-    aiCaption: p.aiCaption,
-    createdAt: p.createdAt.toISOString(),
-  }))
 
   return (
     <AppShell title="사진">
       <PhotosClient
         communityId={activeId}
-        communityName={community.name}
+        communityName={community.name ?? ''}
         communities={user.communities}
         photos={serialized}
       />

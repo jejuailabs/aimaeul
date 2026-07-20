@@ -1,10 +1,9 @@
 import { NextResponse } from 'next/server'
 import { getCurrentUser } from '@/lib/session'
-import { db } from '@/lib/db'
+import { adminDb } from '@/lib/firebase-admin'
 
 export const dynamic = 'force-dynamic'
 
-// GET /api/reports/[id] — 단일 제보 (제보자 본인 또는 마을 admin 만 열람 가능)
 export async function GET(
   _req: Request,
   { params }: { params: Promise<{ id: string }> }
@@ -15,34 +14,33 @@ export async function GET(
   }
   const { id } = await params
 
-  const report = await db.report.findUnique({
-    where: { id },
-    include: {
-      community: {
-        select: { id: true, name: true, regionName: true, communityType: true },
-      },
-    },
-  })
-
-  if (!report) {
+  const reportDoc = await adminDb.collection('reports').doc(id).get()
+  if (!reportDoc.exists) {
     return NextResponse.json({ error: '제보를 찾을 수 없습니다.' }, { status: 404 })
   }
 
-  // 권한: 제보자 본인 OR 해당 마을 admin
-  if (report.reporterId !== user.id) {
-    const member = await db.communityMember.findUnique({
-      where: {
-        communityId_userId: {
-          communityId: report.communityId,
-          userId: user.id,
-        },
-      },
-      select: { role: true },
-    })
-    if (!member || member.role !== 'admin') {
+  const report = reportDoc.data()!
+
+  const commDoc = await adminDb.collection('communities').doc(report.communityId).get()
+  const comm = commDoc.data()
+
+  if (report.reporterId !== user.uid) {
+    const userDoc = await adminDb.collection('users').doc(user.uid).get()
+    const userData = userDoc.data() || {}
+    const isAdmin = userData.adminCommunities?.includes(report.communityId)
+    if (!isAdmin) {
       return NextResponse.json({ error: '열람 권한이 없습니다.' }, { status: 403 })
     }
   }
 
-  return NextResponse.json({ report })
+  return NextResponse.json({
+    report: {
+      id: reportDoc.id,
+      ...report,
+      createdAt: report.createdAt?.toDate?.()?.toISOString?.() ?? null,
+      community: comm
+        ? { id: commDoc.id, name: comm.name, regionName: comm.regionName, communityType: comm.communityType }
+        : null,
+    },
+  })
 }

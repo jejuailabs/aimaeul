@@ -32,5 +32,5 @@ export default async function ReportPage() {
     )
   }
 
-  return <ReportClient communities={communities} userName={user.name} />
+  return <ReportClient communities={communities} userName={user.displayName} />
 }
