@@ -87,6 +87,24 @@ export default async function ChatListPage() {
             참여 중인 마을이 없어요.
           </div>
         )}
+        {/* 전국 공용 채팅방 — 마을 채팅방과 구분되도록 목록 맨 위에 고정 */}
+        {rooms.length > 0 && (
+          <Link
+            href="/app/town-square"
+            className="mb-2 flex items-center gap-3 rounded-2xl border border-primary/40 bg-primary/5 px-3 py-3 transition-colors hover:bg-primary/10"
+          >
+            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-primary/20 text-2xl">
+              🏛️
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="font-semibold">마을 광장</p>
+              <p className="truncate text-sm text-muted-foreground">
+                전국 마을 이웃들과 함께하는 열린 채팅방
+              </p>
+            </div>
+          </Link>
+        )}
+
         <ul className="divide-y divide-border">
           {rooms.map((r) => {
             const meta = communityTypeMeta(r.communityType)

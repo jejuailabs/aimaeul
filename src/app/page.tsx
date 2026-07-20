@@ -1,6 +1,8 @@
 import Link from 'next/link'
 import { MapPin, Sparkles, MessageCircle, Camera, Search } from 'lucide-react'
 import { AuthHeaderActions } from '@/components/auth-header-actions'
+import { GlobalFeed } from '@/components/global-feed'
+import { fetchGlobalFeed } from '@/lib/global-feed'
 import { Button } from '@/components/ui/button'
 import { ThemeToggle } from '@/components/theme-toggle'
 import { KoreaVillageMap } from '@/components/korea-village-map'
@@ -27,6 +29,8 @@ export default async function Home() {
   const commDocs = [...commSnap.docs].sort(
     (a, b) => (a.data().createdAt?.toMillis?.() ?? 0) - (b.data().createdAt?.toMillis?.() ?? 0)
   )
+
+  const feedItems = await fetchGlobalFeed(30)
 
   const publicCommunities = await Promise.all(
     commDocs.map(async (doc) => {
@@ -91,6 +95,17 @@ export default async function Home() {
 
         {/* Map + list */}
         <KoreaVillageMap communities={publicCommunities} />
+
+        {/* 전국 마을 통합 피드 */}
+        <section className="mt-10">
+          <div className="mb-3 flex items-center justify-between">
+            <h2 className="text-lg font-black">지금 마을에서는</h2>
+            <span className="text-xs text-muted-foreground">전국 마을 최신 소식</span>
+          </div>
+          <div className="mx-auto max-w-xl">
+            <GlobalFeed items={feedItems} />
+          </div>
+        </section>
 
         {/* Feature highlights */}
         <section className="mt-10 grid gap-3 sm:grid-cols-3">

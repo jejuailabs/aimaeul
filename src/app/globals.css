@@ -180,11 +180,13 @@ input[type="number"]::-webkit-inner-spin-button {
   filter: brightness(0.7) contrast(1.05) saturate(0.85);
 }
 
-/* 마커: 색 점 + 마을 이름 라벨 */
+/* 마커: 색 점 + 마을 이름 라벨.
+   컨테이너는 점보다 크게 잡아 손가락으로도 누르기 쉽게 한다. */
 .village-marker {
   display: flex;
   align-items: center;
   justify-content: center;
+  cursor: pointer;
 }
 
 .village-marker__dot {
@@ -198,7 +200,7 @@ input[type="number"]::-webkit-inner-spin-button {
 
 .village-marker__label {
   position: absolute;
-  bottom: 18px;
+  bottom: 26px;
   left: 50%;
   transform: translateX(-50%);
   white-space: nowrap;

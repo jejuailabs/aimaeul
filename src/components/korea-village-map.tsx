@@ -1,6 +1,7 @@
 'use client'
 
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useTheme } from 'next-themes'
 import { Search, MapPin, Users, ArrowUpRight } from 'lucide-react'
@@ -37,6 +38,7 @@ export function KoreaVillageMap({ communities }: { communities: PublicCommunity[
   // 지도는 비동기로 생성되므로, 마커 effect가 생성 완료를 기다리도록 상태로 알린다.
   const [ready, setReady] = useState(false)
   const { resolvedTheme } = useTheme()
+  const router = useRouter()
 
   const containerRef = useRef<HTMLDivElement>(null)
   const mapRef = useRef<import('leaflet').Map | null>(null)
@@ -115,18 +117,21 @@ export function KoreaVillageMap({ communities }: { communities: PublicCommunity[
       if (typeof c.lat !== 'number' || typeof c.lng !== 'number') continue
       const meta = communityTypeMeta(c.communityType)
 
+      // 고령 사용자도 누르기 쉽도록 실제 점보다 넓은 터치 영역을 준다.
       const icon = L.divIcon({
         className: 'village-marker',
         html: `<span class="village-marker__dot" style="background:${meta.color}"></span>
                <span class="village-marker__label">${escapeHtml(c.name)}</span>`,
-        iconSize: [14, 14],
-        iconAnchor: [7, 7],
+        iconSize: [34, 34],
+        iconAnchor: [17, 17],
       })
 
       const marker = L.marker([c.lat, c.lng], { icon, title: c.name })
         .addTo(map)
         .on('click', () => {
-          window.location.href = `/village/${c.id}`
+          // window.location은 전체 새로고침이라 눌러도 멈칫한다.
+          // 클라이언트 전환이면 loading.tsx 스켈레톤이 즉시 뜬다.
+          router.push(`/village/${c.id}`)
         })
         .on('mouseover', () => setActive(c.id))
         .on('mouseout', () => setActive(null))
@@ -142,7 +147,7 @@ export function KoreaVillageMap({ communities }: { communities: PublicCommunity[
     if (points.length > 0 && query.trim()) {
       map.fitBounds(L.latLngBounds(points).pad(0.3), { maxZoom: 13 })
     }
-  }, [filtered, query, ready])
+  }, [filtered, query, ready, router])
 
   // 리스트 hover ↔ 마커 강조 연동
   useEffect(() => {
