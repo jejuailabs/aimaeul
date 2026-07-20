@@ -35,6 +35,36 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: '이미 참여 중인 마을이에요.', already: true }, { status: 409 })
   }
 
+  // 슈퍼관리자는 어차피 본인이 승인 권한을 갖는다.
+  // 승인을 기다리게 하면 자기 신청을 자기가 승인해야 하는 이상한 흐름이 되므로
+  // 즉시 참여시키고 이력만 남긴다(체험 목적).
+  if (user.realRole === 'superadmin') {
+    await adminDb.collection('users').doc(user.uid).update({
+      communityIds: FieldValue.arrayUnion(communityId),
+    })
+
+    const ref = adminDb.collection('membershipRequests').doc()
+    await ref.set({
+      requestId: ref.id,
+      communityId,
+      communityName: community.name,
+      communityType: community.communityType,
+      regionName: community.regionName,
+      uid: user.uid,
+      displayName: user.displayName,
+      photoURL: user.photoURL,
+      email: user.email,
+      message: null,
+      source: 'superadmin',
+      status: 'approved',
+      createdAt: FieldValue.serverTimestamp(),
+      decidedAt: FieldValue.serverTimestamp(),
+      decidedBy: user.uid,
+    })
+
+    return NextResponse.json({ ok: true, approved: true, communityId, id: ref.id })
+  }
+
   // 같은 마을에 대기 중인 신청이 있으면 중복 생성하지 않는다.
   const dup = await adminDb
     .collection('membershipRequests')

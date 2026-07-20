@@ -42,9 +42,12 @@ type PendingRequest = {
 export function OnboardingClient({
   communities,
   pendingRequests,
+  isSuperadmin = false,
 }: {
   communities: PublicCommunity[]
   pendingRequests: PendingRequest[]
+  /** 슈퍼관리자는 승인 없이 즉시 참여해 체험할 수 있다. */
+  isSuperadmin?: boolean
 }) {
   const router = useRouter()
   const [tab, setTab] = useState<'search' | 'code'>('search')
@@ -101,6 +104,13 @@ export function OnboardingClient({
       }
       if (!res.ok) {
         toast.error(data.error || '가입 신청에 실패했어요.')
+        return
+      }
+
+      // 슈퍼관리자는 즉시 참여되므로 바로 채팅방으로 들어간다.
+      if (data.approved) {
+        toast.success('마을에 참여했어요!')
+        router.push(`/app/chat/${communityId}`)
         return
       }
 
@@ -167,7 +177,8 @@ export function OnboardingClient({
 
       <main className="mx-auto w-full max-w-3xl flex-1 px-4 py-6">
         {/* 승인 대기 안내 */}
-        {pending.length > 0 && (
+        {/* 슈퍼관리자는 승인을 기다릴 일이 없다 */}
+        {!isSuperadmin && pending.length > 0 && (
           <section className="mb-6 rounded-2xl border border-primary/40 bg-primary/5 p-4">
             <div className="mb-2 flex items-center gap-2">
               <Clock className="h-4 w-4 text-primary" />
@@ -334,6 +345,8 @@ export function OnboardingClient({
                           <>
                             <Check className="mr-1 h-4 w-4" /> 신청됨
                           </>
+                        ) : isSuperadmin ? (
+                          '바로 입장'
                         ) : (
                           '가입 신청'
                         )}

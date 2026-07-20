@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { ArrowLeft } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { BottomTabBar } from '@/components/bottom-tab-bar'
+import { ViewModeBadge } from '@/components/view-mode-badge'
 import { cn } from '@/lib/utils'
 
 /**
@@ -39,6 +40,8 @@ export function AppShell({
           )}
           {title && <h1 className="flex-1 truncate text-base font-semibold">{title}</h1>}
           {!title && <div className="flex-1" />}
+          {/* 슈퍼관리자만 보이며, 탭 한 번으로 회장/회원 시점 전환 */}
+          <ViewModeBadge />
           {right}
         </header>
       )}

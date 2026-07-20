@@ -70,6 +70,7 @@ export default async function OnboardingPage() {
     <OnboardingClient
       communities={publicCommunities}
       pendingRequests={pendingRequests}
+      isSuperadmin={user.realRole === 'superadmin'}
     />
   )
 }
