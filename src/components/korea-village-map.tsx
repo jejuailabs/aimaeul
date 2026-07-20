@@ -71,7 +71,7 @@ export function KoreaVillageMap({ communities }: { communities: PublicCommunity[
         const map = L.map(containerRef.current, {
           center: KOREA_CENTER,
           zoom: KOREA_ZOOM,
-          scrollWheelZoom: false, // 페이지 스크롤을 가로채지 않도록
+          scrollWheelZoom: true, // 지도 위에서 스크롤하면 줌
           attributionControl: true,
         })
         L.tileLayer(OSM_URL, { attribution: OSM_ATTRIBUTION, maxZoom: 19 }).addTo(map)

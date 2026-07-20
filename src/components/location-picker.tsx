@@ -49,7 +49,7 @@ export function LocationPicker({
         const map = L.map(containerRef.current, {
           center: value ? [value.lat, value.lng] : KOREA_CENTER,
           zoom: value ? 13 : KOREA_ZOOM,
-          scrollWheelZoom: false,
+          scrollWheelZoom: true, // 위치를 정확히 찍으려면 줌이 필요하다
         })
         L.tileLayer(OSM_URL, { attribution: OSM_ATTRIBUTION, maxZoom: 19 }).addTo(map)
 
