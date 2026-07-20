@@ -21,14 +21,19 @@ export default async function Home() {
     redirect('/onboarding')
   }
 
+  // isPublic + createdAt 복합 인덱스를 요구하지 않도록 정렬은 메모리에서 처리한다.
+  // 공개 마을 수는 많지 않아 부담이 없다.
   const commSnap = await adminDb
     .collection('communities')
     .where('isPublic', '==', true)
-    .orderBy('createdAt', 'asc')
     .get()
 
+  const commDocs = [...commSnap.docs].sort(
+    (a, b) => (a.data().createdAt?.toMillis?.() ?? 0) - (b.data().createdAt?.toMillis?.() ?? 0)
+  )
+
   const publicCommunities = await Promise.all(
-    commSnap.docs.map(async (doc) => {
+    commDocs.map(async (doc) => {
       const c = doc.data()
       const membersSnap = await adminDb
         .collection('users')

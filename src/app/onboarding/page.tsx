@@ -10,14 +10,18 @@ export default async function OnboardingPage() {
   if (!user) redirect('/login?callbackUrl=/onboarding')
   if (user.communities.length > 0) redirect('/app/chat')
 
+  // isPublic + createdAt 복합 인덱스를 요구하지 않도록 정렬은 메모리에서 처리한다.
   const commSnap = await adminDb
     .collection('communities')
     .where('isPublic', '==', true)
-    .orderBy('createdAt', 'asc')
     .get()
 
+  const commDocs = [...commSnap.docs].sort(
+    (a, b) => (a.data().createdAt?.toMillis?.() ?? 0) - (b.data().createdAt?.toMillis?.() ?? 0)
+  )
+
   const publicCommunities = await Promise.all(
-    commSnap.docs.map(async (doc) => {
+    commDocs.map(async (doc) => {
       const c = doc.data()
       const membersSnap = await adminDb
         .collection('users')
