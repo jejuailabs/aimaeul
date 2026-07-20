@@ -1,6 +1,5 @@
 import Link from 'next/link'
-import { redirect } from 'next/navigation'
-import { LogIn, MapPin, Sparkles, MessageCircle, Camera, Search } from 'lucide-react'
+import { LogIn, MapPin, Sparkles, MessageCircle, Camera, Search, Plus } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { ThemeToggle } from '@/components/theme-toggle'
 import { KoreaVillageMap } from '@/components/korea-village-map'
@@ -12,14 +11,10 @@ export const dynamic = 'force-dynamic'
 export const revalidate = 0
 
 export default async function Home() {
-  // 02 문서: 로그인 + 소속 공동체 있음 → /app/chat 자동 리다이렉트
+  // 05 문서: 지도는 로그인 여부와 무관하게 항상 접근 가능해야 한다.
+  // 로그인 직후 라우팅(/onboarding, /app/chat)은 /login에서 처리하므로
+  // 여기서 리다이렉트하면 "마을 지도" 링크가 원래 화면으로 튕겨 나온다.
   const user = await getCurrentUser()
-  if (user && user.communities.length > 0) {
-    redirect('/app/chat')
-  }
-  if (user && user.communities.length === 0) {
-    redirect('/onboarding')
-  }
 
   // isPublic + createdAt 복합 인덱스를 요구하지 않도록 정렬은 메모리에서 처리한다.
   // 공개 마을 수는 많지 않아 부담이 없다.
@@ -71,11 +66,25 @@ export default async function Home() {
           <div className="flex items-center gap-2">
             <SearchBar communities={publicCommunities} />
             <ThemeToggle compact />
-            <Button asChild size="sm" className="rounded-full">
-              <Link href="/login">
-                <LogIn className="mr-1 h-4 w-4" /> 로그인
-              </Link>
-            </Button>
+            {!user ? (
+              <Button asChild size="sm" className="rounded-full">
+                <Link href="/login">
+                  <LogIn className="mr-1 h-4 w-4" /> 로그인
+                </Link>
+              </Button>
+            ) : user.communities.length > 0 ? (
+              <Button asChild size="sm" className="rounded-full">
+                <Link href="/app/chat">
+                  <MessageCircle className="mr-1 h-4 w-4" /> 채팅 앱으로
+                </Link>
+              </Button>
+            ) : (
+              <Button asChild size="sm" className="rounded-full">
+                <Link href="/onboarding">
+                  <Plus className="mr-1 h-4 w-4" /> 마을 참여하기
+                </Link>
+              </Button>
+            )}
           </div>
         </div>
       </header>

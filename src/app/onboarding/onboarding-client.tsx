@@ -154,7 +154,15 @@ export function OnboardingClient({
         <Link href="/" className="text-sm font-semibold text-muted-foreground">
           ← 마을 지도
         </Link>
-        <ThemeToggle />
+        <div className="flex items-center gap-2">
+          <ThemeToggle />
+          <Link
+            href="/app/me"
+            className="rounded-full border border-border px-3 py-1.5 text-xs font-medium transition-colors hover:bg-muted/40"
+          >
+            내 정보
+          </Link>
+        </div>
       </header>
 
       <main className="mx-auto w-full max-w-3xl flex-1 px-4 py-6">
@@ -239,7 +247,7 @@ export function OnboardingClient({
               </div>
             </div>
 
-            {/* 2단계: 시군구 */}
+            {/* 2단계: 시군구 — 시도를 골라야 나타난다 */}
             {sido && (
               <div>
                 <label className="mb-2 block text-sm font-semibold">2. 시 / 군 / 구</label>
@@ -263,7 +271,10 @@ export function OnboardingClient({
 
             {/* 3단계: 모임 종류 */}
             <div>
-              <label className="mb-2 block text-sm font-semibold">3. 모임 종류</label>
+              {/* 2단계가 숨겨진 상태에서는 번호가 건너뛰지 않도록 맞춘다 */}
+              <label className="mb-2 block text-sm font-semibold">
+                {sido ? '3' : '2'}. 모임 종류
+              </label>
               <div className="flex flex-wrap gap-2">
                 {COMMUNITY_TYPES.map((t) => (
                   <button
