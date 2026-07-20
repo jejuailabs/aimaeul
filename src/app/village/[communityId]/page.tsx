@@ -4,6 +4,7 @@ import { Calendar, Home as HomeIcon, MapPin, Users, Sparkles, Camera, Gamepad2, 
 import { adminDb } from '@/lib/firebase-admin'
 import { getCurrentUser } from '@/lib/session'
 import { ThemeToggle } from '@/components/theme-toggle'
+import { AuthHeaderActions } from '@/components/auth-header-actions'
 import { CommunityBadge } from '@/components/community-badge'
 import { PhotoWithExif } from '@/components/exif-overlay'
 import { LiveChatPanel } from '@/components/live-chat-panel'
@@ -59,7 +60,10 @@ export default async function VillageHomePage({
       <div className="flex min-h-screen flex-col">
         <header className="sticky top-0 z-30 flex items-center justify-between border-b border-border/60 bg-background/95 px-4 py-3 backdrop-blur">
           <Link href="/" className="text-sm font-semibold text-muted-foreground">← 마을 지도</Link>
-          <ThemeToggle compact />
+          <div className="flex items-center gap-2">
+            <ThemeToggle compact />
+            <AuthHeaderActions />
+          </div>
         </header>
         <main className="mx-auto flex w-full max-w-md flex-1 flex-col items-center justify-center px-4 text-center">
           <div className="mb-4 flex h-20 w-20 items-center justify-center rounded-3xl bg-muted text-4xl">🔒</div>
@@ -180,12 +184,10 @@ export default async function VillageHomePage({
       <header className="sticky top-0 z-30 flex items-center justify-between border-b border-border/60 bg-background/80 px-4 py-3 backdrop-blur">
         <Link href="/" className="text-sm font-semibold text-muted-foreground">← 마을 지도</Link>
         <div className="flex items-center gap-2">
-          {isMember && (
-            <Button asChild size="sm" className="rounded-full">
-              <Link href={`/app/chat/${communityId}`}>채팅 앱으로</Link>
-            </Button>
-          )}
           <ThemeToggle compact />
+          <AuthHeaderActions
+            chatHref={isMember ? `/app/chat/${communityId}` : '/app/chat'}
+          />
         </div>
       </header>
 

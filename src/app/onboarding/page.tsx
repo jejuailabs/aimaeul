@@ -24,9 +24,11 @@ export default async function OnboardingPage() {
   const publicCommunities = await Promise.all(
     commDocs.map(async (doc) => {
       const c = doc.data()
+      // 문서를 전부 가져오지 않고 집계만 한다.
       const membersSnap = await adminDb
         .collection('users')
         .where('communityIds', 'array-contains', doc.id)
+        .count()
         .get()
       // 문서에 sido/sigungu가 없으면 regionName에서 추론한다(기존 데이터 호환).
       const parsed = parseRegion(c.regionName ?? '')
@@ -41,7 +43,7 @@ export default async function OnboardingPage() {
         lng: c.lng ?? 0,
         coverImageUrl: c.coverImageUrl ?? null,
         description: c.description ?? null,
-        memberCount: membersSnap.size,
+        memberCount: membersSnap.data().count,
       }
     })
   )

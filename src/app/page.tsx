@@ -1,5 +1,6 @@
 import Link from 'next/link'
-import { LogIn, MapPin, Sparkles, MessageCircle, Camera, Search, Plus } from 'lucide-react'
+import { MapPin, Sparkles, MessageCircle, Camera, Search } from 'lucide-react'
+import { AuthHeaderActions } from '@/components/auth-header-actions'
 import { Button } from '@/components/ui/button'
 import { ThemeToggle } from '@/components/theme-toggle'
 import { KoreaVillageMap } from '@/components/korea-village-map'
@@ -68,25 +69,7 @@ export default async function Home() {
           <div className="flex items-center gap-2">
             <SearchBar communities={publicCommunities} />
             <ThemeToggle compact />
-            {!user ? (
-              <Button asChild size="sm" className="rounded-full">
-                <Link href="/login">
-                  <LogIn className="mr-1 h-4 w-4" /> 로그인
-                </Link>
-              </Button>
-            ) : user.communities.length > 0 ? (
-              <Button asChild size="sm" className="rounded-full">
-                <Link href="/app/chat">
-                  <MessageCircle className="mr-1 h-4 w-4" /> 채팅 앱으로
-                </Link>
-              </Button>
-            ) : (
-              <Button asChild size="sm" className="rounded-full">
-                <Link href="/onboarding">
-                  <Plus className="mr-1 h-4 w-4" /> 마을 참여하기
-                </Link>
-              </Button>
-            )}
+            <AuthHeaderActions />
           </div>
         </div>
       </header>
