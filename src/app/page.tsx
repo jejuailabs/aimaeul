@@ -1,0 +1,127 @@
+import Link from 'next/link'
+import { redirect } from 'next/navigation'
+import { LogIn, MapPin, Sparkles, MessageCircle, Camera } from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import { ThemeToggle } from '@/components/theme-toggle'
+import { KoreaVillageMap } from '@/components/korea-village-map'
+import { getCurrentUser } from '@/lib/session'
+import { db } from '@/lib/db'
+
+export const dynamic = 'force-dynamic'
+export const revalidate = 0
+
+export default async function Home() {
+  // 02 문서: 로그인 + 소속 공동체 있음 → /app/chat 자동 리다이렉트
+  const user = await getCurrentUser()
+  if (user && user.communities.length > 0) {
+    redirect('/app/chat')
+  }
+  if (user && user.communities.length === 0) {
+    redirect('/onboarding')
+  }
+
+  const communities = await db.community.findMany({
+    where: { isPublic: true },
+    include: { _count: { select: { members: true } } },
+    orderBy: { createdAt: 'asc' },
+  })
+
+  const publicCommunities = communities.map((c) => ({
+    id: c.id,
+    name: c.name,
+    communityType: c.communityType,
+    regionName: c.regionName,
+    lat: c.lat,
+    lng: c.lng,
+    coverImageUrl: c.coverImageUrl,
+    description: c.description,
+    memberCount: c._count.members,
+  }))
+
+  return (
+    <div className="flex min-h-screen flex-col">
+      {/* Header */}
+      <header className="sticky top-0 z-30 border-b border-border/60 bg-background/80 backdrop-blur">
+        <div className="mx-auto flex max-w-6xl items-center justify-between gap-3 px-4 py-3">
+          <Link href="/" className="flex items-center gap-2">
+            <span className="flex h-9 w-9 items-center justify-center rounded-2xl bg-primary text-lg font-black text-primary-foreground">
+              마
+            </span>
+            <div className="leading-tight">
+              <p className="text-sm font-bold">우리마을</p>
+              <p className="text-[10px] text-muted-foreground">마을 공동체 플랫폼</p>
+            </div>
+          </Link>
+          <div className="flex items-center gap-2">
+            <ThemeToggle compact />
+            <Button asChild size="sm" className="rounded-full">
+              <Link href="/login">
+                <LogIn className="mr-1 h-4 w-4" /> 로그인
+              </Link>
+            </Button>
+          </div>
+        </div>
+      </header>
+
+      <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-6">
+        {/* Hero */}
+        <section className="mb-6 text-center">
+          <div className="mb-3 inline-flex items-center gap-1.5 rounded-full bg-primary/15 px-3 py-1 text-xs font-medium text-primary-foreground/80">
+            <Sparkles className="h-3.5 w-3.5" /> 카카오톡처럼 쓰는 마을 공동체 플랫폼
+          </div>
+          <h1 className="text-2xl font-black leading-tight sm:text-3xl">
+            대한민국 마을, 지도로 만나보세요
+          </h1>
+          <p className="mx-auto mt-2 max-w-xl text-sm text-muted-foreground">
+            부녀회·청년회·노인회·동호회가 올리는 사진과 대화가 실시간으로 모여,
+            <br className="hidden sm:block" /> AI가 자동으로 마을 아카이브를 만듭니다.
+          </p>
+        </section>
+
+        {/* Map + list */}
+        <KoreaVillageMap communities={publicCommunities} />
+
+        {/* Feature highlights */}
+        <section className="mt-10 grid gap-3 sm:grid-cols-3">
+          {[
+            {
+              icon: MessageCircle,
+              title: '실시간 채팅',
+              desc: '회원이 카카오톡처럼 대화하면 마을 홈페이지에 즉시 반영돼요.',
+            },
+            {
+              icon: Camera,
+              title: '사진 EXIF 자동',
+              desc: '사진만 올리면 촬영일·위치·기기가 자동으로 표시돼요.',
+            },
+            {
+              icon: Sparkles,
+              title: 'AI 마을 신문',
+              desc: 'AI가 매일 마을의 활동을 요약해 신문으로 만들어드려요.',
+            },
+          ].map((f) => (
+            <div
+              key={f.title}
+              className="rounded-2xl border border-border bg-card p-4"
+            >
+              <div className="mb-2 flex h-9 w-9 items-center justify-center rounded-xl bg-primary/15">
+                <f.icon className="h-5 w-5 text-primary-foreground/70" />
+              </div>
+              <h3 className="font-semibold">{f.title}</h3>
+              <p className="mt-1 text-xs text-muted-foreground">{f.desc}</p>
+            </div>
+          ))}
+        </section>
+      </main>
+
+      <footer className="mt-auto border-t border-border/60 bg-muted/30">
+        <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-2 px-4 py-5 text-xs text-muted-foreground sm:flex-row">
+          <p className="flex items-center gap-1">
+            <MapPin className="h-3.5 w-3.5" /> 우리마을 — 마을 공동체 디지털 플랫폼
+          </p>
+          <p>회원가입은 Google 로그인 한 번으로 끝나요.</p>
+        </div>
+      </footer>
+    </div>
+  )
+}
