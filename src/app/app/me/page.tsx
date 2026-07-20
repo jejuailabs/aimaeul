@@ -2,7 +2,7 @@
 
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { LogOut, Plus, MapPin, Megaphone, Building2, Smile, ChevronRight } from 'lucide-react'
+import { LogOut, Plus, MapPin, Megaphone, Building2, Smile, ChevronRight, UserCheck } from 'lucide-react'
 import { AppShell } from '@/components/app-shell'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
@@ -14,6 +14,8 @@ import { toast } from 'sonner'
 export default function MePage() {
   const router = useRouter()
   const { user, communities, signOut } = useAuth()
+  const canManageMembers =
+    user?.role === 'superadmin' || (user?.adminCommunities?.length ?? 0) > 0
 
   async function handleLogout() {
     await fetch('/api/auth/session', { method: 'DELETE' })
@@ -116,6 +118,16 @@ export default function MePage() {
             <Building2 className="h-5 w-5 text-muted-foreground" />
             <span className="text-sm font-medium">빈집소개</span>
           </Link>
+
+          {canManageMembers && (
+            <Link
+              href="/app/admin/members"
+              className="flex items-center gap-3 rounded-2xl border border-primary/40 bg-primary/5 p-3 transition-colors hover:bg-primary/10"
+            >
+              <UserCheck className="h-5 w-5 text-primary" />
+              <span className="text-sm font-medium">가입 승인 관리</span>
+            </Link>
+          )}
 
           <Link
             href="/app/emoji-packs"

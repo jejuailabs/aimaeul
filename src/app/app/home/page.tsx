@@ -5,6 +5,7 @@ import { getCurrentUser } from '@/lib/session'
 import { adminDb } from '@/lib/firebase-admin'
 import { AppShell } from '@/components/app-shell'
 import { CommunityBadge } from '@/components/community-badge'
+import { InviteLinkCard } from '@/components/invite-link-card'
 import { PhotoWithExif } from '@/components/exif-overlay'
 import { Button } from '@/components/ui/button'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
@@ -143,6 +144,16 @@ export default async function MemberHomePage({
             </Link>
           ))}
         </div>
+
+        {/* 초대 링크 — 코드 입력이 어려운 회원을 위해 링크 한 번으로 참여 */}
+        {community.inviteCode && (
+          <div className="mt-3">
+            <InviteLinkCard
+              inviteCode={community.inviteCode}
+              communityName={community.name}
+            />
+          </div>
+        )}
 
         {/* Upcoming events */}
         {upcomingEvents.length > 0 && (

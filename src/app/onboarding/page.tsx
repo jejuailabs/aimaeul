@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation'
 import { getCurrentUser } from '@/lib/session'
 import { adminDb } from '@/lib/firebase-admin'
+import { parseRegion } from '@/lib/regions'
 import { OnboardingClient } from './onboarding-client'
 
 export const dynamic = 'force-dynamic'
@@ -27,11 +28,15 @@ export default async function OnboardingPage() {
         .collection('users')
         .where('communityIds', 'array-contains', doc.id)
         .get()
+      // 문서에 sido/sigungu가 없으면 regionName에서 추론한다(기존 데이터 호환).
+      const parsed = parseRegion(c.regionName ?? '')
       return {
         id: doc.id,
         name: c.name ?? '',
         communityType: c.communityType ?? '',
         regionName: c.regionName ?? '',
+        sido: c.sido ?? parsed.sido ?? '',
+        sigungu: c.sigungu ?? parsed.sigungu ?? '',
         lat: c.lat ?? 0,
         lng: c.lng ?? 0,
         coverImageUrl: c.coverImageUrl ?? null,
@@ -41,5 +46,28 @@ export default async function OnboardingPage() {
     })
   )
 
-  return <OnboardingClient communities={publicCommunities} />
+  // 이미 낸 신청이 있으면 "승인 대기" 상태를 보여준다.
+  const pendingSnap = await adminDb
+    .collection('membershipRequests')
+    .where('uid', '==', user.uid)
+    .where('status', '==', 'pending')
+    .get()
+
+  const pendingRequests = pendingSnap.docs.map((d) => {
+    const r = d.data()
+    return {
+      id: d.id,
+      communityId: r.communityId,
+      communityName: r.communityName ?? '',
+      communityType: r.communityType ?? '',
+      regionName: r.regionName ?? '',
+    }
+  })
+
+  return (
+    <OnboardingClient
+      communities={publicCommunities}
+      pendingRequests={pendingRequests}
+    />
+  )
 }

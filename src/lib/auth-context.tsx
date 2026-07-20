@@ -22,6 +22,10 @@ type AuthUser = {
   displayName: string
   email: string | null
   photoURL: string | null
+  /** 전역 역할. 슈퍼관리자는 모든 마을의 가입 신청을 승인할 수 있다. */
+  role: 'superadmin' | 'user'
+  /** 회장으로 지정된 공동체 id 목록. */
+  adminCommunities: string[]
 }
 
 type CommunityRef = {
@@ -83,13 +87,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       if (firebaseUser) {
-        const authUser: AuthUser = {
+        const baseUser = {
           uid: firebaseUser.uid,
           displayName: firebaseUser.displayName || '익명',
           email: firebaseUser.email,
           photoURL: firebaseUser.photoURL,
         }
-        setUser(authUser)
+        // 역할은 users 문서에만 있으므로, 우선 기본값으로 노출한 뒤 조회 결과로 갱신한다.
+        setUser({ ...baseUser, role: 'user', adminCommunities: [] })
 
         const userRef = doc(firestore, 'users', firebaseUser.uid)
         const userSnap = await getDoc(userRef)
@@ -105,9 +110,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           })
           setCommunities([])
         } else {
+          const data = userSnap.data()
+          setUser({
+            ...baseUser,
+            role: data.role === 'superadmin' ? 'superadmin' : 'user',
+            adminCommunities: data.adminCommunities || [],
+          })
           const comms = await fetchUserCommunities(firebaseUser.uid)
           setCommunities(comms)
-          const savedTheme = userSnap.data().themePreference
+          const savedTheme = data.themePreference
           if (savedTheme && typeof window !== 'undefined') {
             const { useTheme } = await import('next-themes')
             document.documentElement.setAttribute('data-theme', savedTheme === 'system' ? '' : savedTheme)

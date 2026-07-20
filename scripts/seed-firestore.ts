@@ -21,6 +21,8 @@ async function seed() {
       id: 'comm_saneuri',
       name: '산으리마을',
       regionName: '경상북도 영양군 석보면',
+      sido: '경상북도',
+      sigungu: '영양군',
       communityType: '부녀회',
       description: '산으리마을 부녀회입니다. 함께 모여 마을을 가꿔가요!',
       lat: 36.6248,
@@ -34,6 +36,8 @@ async function seed() {
       id: 'comm_dure',
       name: '두레마을 청년회',
       regionName: '전라남도 담양군 수북면',
+      sido: '전라남도',
+      sigungu: '담양군',
       communityType: '청년회',
       description: '두레마을 청년들이 함께 만들어가는 커뮤니티입니다.',
       lat: 35.2686,
@@ -46,7 +50,9 @@ async function seed() {
     {
       id: 'comm_songhak',
       name: '송학마을 노인회',
-      regionName: '강원도 평창군 대화면',
+      regionName: '강원특별자치도 평창군 대화면',
+      sido: '강원특별자치도',
+      sigungu: '평창군',
       communityType: '노인회',
       description: '송학마을 어르신들의 소통 공간입니다.',
       lat: 37.5203,
@@ -69,6 +75,8 @@ async function seed() {
     email: 'test@example.com',
     photoURL: null,
     communityIds: ['comm_saneuri', 'comm_dure'],
+    role: 'superadmin',
+    adminCommunities: ['comm_saneuri', 'comm_dure', 'comm_songhak'],
     createdAt: FieldValue.serverTimestamp(),
   }
   await db.collection('users').doc('demo_user_001').set(demoUser)
@@ -79,6 +87,8 @@ async function seed() {
     email: 'younghee@example.com',
     photoURL: null,
     communityIds: ['comm_saneuri'],
+    role: 'user',
+    adminCommunities: ['comm_saneuri'],
     createdAt: FieldValue.serverTimestamp(),
   }
   await db.collection('users').doc('demo_user_002').set(demoUser2)
@@ -89,6 +99,8 @@ async function seed() {
     email: 'cheolsu@example.com',
     photoURL: null,
     communityIds: ['comm_saneuri', 'comm_dure', 'comm_songhak'],
+    role: 'user',
+    adminCommunities: [],
     createdAt: FieldValue.serverTimestamp(),
   }
   await db.collection('users').doc('demo_user_003').set(demoUser3)

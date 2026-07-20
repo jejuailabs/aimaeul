@@ -93,6 +93,14 @@ service cloud.firestore {
       allow write: if false; // 서버(admin SDK)로만 생성
     }
 
+    // membershipRequests 컬렉션 (최상위)
+    // 생성/승인/거절은 모두 서버(admin SDK)를 통해서만 처리한다.
+    // 본인 신청 현황 조회만 클라이언트에 허용.
+    match /membershipRequests/{requestId} {
+      allow read: if isAuth() && resource.data.uid == request.auth.uid;
+      allow write: if false;
+    }
+
     // emojiPacks 컬렉션 (최상위)
     match /emojiPacks/{packId} {
       allow read: if true;
