@@ -1,12 +1,14 @@
 'use client'
 
 import Link from 'next/link'
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { useTheme } from 'next-themes'
 import { Search, MapPin, Users, ArrowUpRight } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { CommunityBadge } from '@/components/community-badge'
 import { communityTypeMeta } from '@/lib/village'
 import { cn } from '@/lib/utils'
+import 'leaflet/dist/leaflet.css'
 
 type PublicCommunity = {
   id: string
@@ -20,82 +22,26 @@ type PublicCommunity = {
   memberCount?: number
 }
 
-// 대한민국 위경도 → SVG 좌표 투영
-const LNG_MIN = 124.5
-const LNG_MAX = 132.0
-const LAT_MIN = 33.0
-const LAT_MAX = 38.9
-const W = 360
-const H = 720
+// 대한민국 전체가 들어오는 초기 뷰
+const KOREA_CENTER: [number, number] = [36.3, 127.8]
+const KOREA_ZOOM = 7
 
-function project(lat: number, lng: number) {
-  const x = ((lng - LNG_MIN) / (LNG_MAX - LNG_MIN)) * W
-  const y = ((LAT_MAX - lat) / (LAT_MAX - LAT_MIN)) * H
-  return { x, y }
-}
+// OSM 타일 사용 정책상 출처 표기는 필수다.
+const OSM_URL = 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png'
+const OSM_ATTRIBUTION =
+  '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> 기여자'
 
-// 단순화된 한반도 육지 실루엣 (인식 가능한 수준, 정확한 지형 아님)
-const KOREA_PATH = `
-M 150 40
-C 170 30, 200 28, 220 38
-L 235 55
-L 245 70
-L 255 90
-L 268 110
-L 280 140
-L 288 175
-L 300 210
-L 312 250
-L 318 290
-L 320 330
-L 315 365
-L 305 395
-L 295 425
-L 285 460
-L 275 495
-L 262 525
-L 248 550
-L 235 565
-L 222 575
-L 210 580
-L 198 575
-L 188 560
-L 178 540
-L 168 515
-L 158 485
-L 150 450
-L 144 415
-L 140 380
-L 138 345
-L 136 310
-L 134 275
-L 130 240
-L 124 205
-L 118 170
-L 112 138
-L 108 110
-L 112 85
-L 120 62
-L 135 48
-Z
-`
-
-const JEJU_PATH = `
-M 150 605
-C 158 600, 172 601, 178 612
-C 182 622, 180 635, 170 640
-C 158 643, 148 638, 145 628
-C 143 618, 146 608, 150 605
-Z
-`
-
-export function KoreaVillageMap({
-  communities,
-}: {
-  communities: PublicCommunity[]
-}) {
+export function KoreaVillageMap({ communities }: { communities: PublicCommunity[] }) {
   const [query, setQuery] = useState('')
   const [active, setActive] = useState<string | null>(null)
+  // 지도는 비동기로 생성되므로, 마커 effect가 생성 완료를 기다리도록 상태로 알린다.
+  const [ready, setReady] = useState(false)
+  const { resolvedTheme } = useTheme()
+
+  const containerRef = useRef<HTMLDivElement>(null)
+  const mapRef = useRef<import('leaflet').Map | null>(null)
+  const markersRef = useRef<Map<string, import('leaflet').Marker>>(new Map())
+  const leafletRef = useRef<typeof import('leaflet') | null>(null)
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase()
@@ -108,79 +54,106 @@ export function KoreaVillageMap({
     )
   }, [communities, query])
 
-  const markers = filtered.map((c) => ({ ...c, ...project(c.lat, c.lng) }))
+  // 지도 초기화 (한 번만)
+  useEffect(() => {
+    if (mapRef.current || !containerRef.current) return
+
+    let cancelled = false
+    ;(async () => {
+      try {
+        // 번들러에 따라 CJS default interop 결과가 달라져 둘 다 대응한다.
+        const mod = await import('leaflet')
+        const L = ((mod as unknown as { default?: typeof import('leaflet') }).default ??
+          mod) as typeof import('leaflet')
+        if (cancelled || !containerRef.current || mapRef.current) return
+
+        leafletRef.current = L
+        const map = L.map(containerRef.current, {
+          center: KOREA_CENTER,
+          zoom: KOREA_ZOOM,
+          scrollWheelZoom: false, // 페이지 스크롤을 가로채지 않도록
+          attributionControl: true,
+        })
+        L.tileLayer(OSM_URL, { attribution: OSM_ATTRIBUTION, maxZoom: 19 }).addTo(map)
+        mapRef.current = map
+        setReady(true)
+      } catch (e) {
+        console.error('[korea-village-map] 지도 초기화 실패:', e)
+      }
+    })()
+
+    return () => {
+      cancelled = true
+      mapRef.current?.remove()
+      mapRef.current = null
+      markersRef.current.clear()
+      setReady(false)
+    }
+  }, [])
+
+  // 마커 동기화 (검색 결과가 바뀔 때마다)
+  useEffect(() => {
+    const L = leafletRef.current
+    const map = mapRef.current
+    if (!L || !map) return
+
+    for (const marker of markersRef.current.values()) marker.remove()
+    markersRef.current.clear()
+
+    for (const c of filtered) {
+      if (typeof c.lat !== 'number' || typeof c.lng !== 'number') continue
+      const meta = communityTypeMeta(c.communityType)
+
+      const icon = L.divIcon({
+        className: 'village-marker',
+        html: `<span class="village-marker__dot" style="background:${meta.color}"></span>
+               <span class="village-marker__label">${escapeHtml(c.name)}</span>`,
+        iconSize: [14, 14],
+        iconAnchor: [7, 7],
+      })
+
+      const marker = L.marker([c.lat, c.lng], { icon, title: c.name })
+        .addTo(map)
+        .on('click', () => {
+          window.location.href = `/village/${c.id}`
+        })
+        .on('mouseover', () => setActive(c.id))
+        .on('mouseout', () => setActive(null))
+
+      markersRef.current.set(c.id, marker)
+    }
+
+    // 검색으로 좁혀지면 결과에 맞춰 뷰를 이동
+    const points = filtered
+      .filter((c) => typeof c.lat === 'number' && typeof c.lng === 'number')
+      .map((c) => [c.lat, c.lng] as [number, number])
+
+    if (points.length > 0 && query.trim()) {
+      map.fitBounds(L.latLngBounds(points).pad(0.3), { maxZoom: 13 })
+    }
+  }, [filtered, query, ready])
+
+  // 리스트 hover ↔ 마커 강조 연동
+  useEffect(() => {
+    for (const [id, marker] of markersRef.current) {
+      const el = marker.getElement()
+      if (el) el.classList.toggle('village-marker--active', id === active)
+    }
+  }, [active])
 
   return (
     <div className="grid gap-6 lg:grid-cols-[1.1fr_1fr]">
       {/* Map panel */}
-      <div className="relative overflow-hidden rounded-3xl border border-border bg-gradient-to-b from-primary/5 to-background p-2">
-        <div className="relative mx-auto aspect-[1/2] w-full max-w-md">
-          <svg
-            viewBox={`0 0 ${W} ${H + 80}`}
-            className="h-full w-full"
-            role="img"
-            aria-label="대한민국 마을 지도"
-          >
-            {/* sea */}
-            <rect x="0" y="0" width={W} height={H + 80} fill="url(#sea)" />
-            <defs>
-              <linearGradient id="sea" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="oklch(0.97 0.02 220)" />
-                <stop offset="100%" stopColor="oklch(0.93 0.03 220)" />
-              </linearGradient>
-              <radialGradient id="glow">
-                <stop offset="0%" stopColor="#FEE500" stopOpacity="0.9" />
-                <stop offset="100%" stopColor="#FEE500" stopOpacity="0" />
-              </radialGradient>
-            </defs>
-            {/* land */}
-            <path
-              d={KOREA_PATH}
-              className="fill-card stroke-border"
-              strokeWidth={1.2}
-            />
-            <path
-              d={JEJU_PATH}
-              className="fill-card stroke-border"
-              strokeWidth={1.2}
-            />
-
-            {/* markers */}
-            {markers.map((m) => {
-              const meta = communityTypeMeta(m.communityType)
-              const isActive = active === m.id
-              return (
-                <g
-                  key={m.id}
-                  transform={`translate(${m.x}, ${m.y})`}
-                  className="cursor-pointer"
-                  onMouseEnter={() => setActive(m.id)}
-                  onMouseLeave={() => setActive(null)}
-                  onClick={() => (window.location.href = `/village/${m.id}`)}
-                >
-                  {isActive && (
-                    <circle r={20} fill="url(#glow)" />
-                  )}
-                  <circle
-                    r={isActive ? 11 : 8}
-                    fill={meta.color}
-                    stroke="white"
-                    strokeWidth={2}
-                    className="transition-all"
-                  />
-                  <text
-                    y={isActive ? -16 : -12}
-                    textAnchor="middle"
-                    className="pointer-events-none select-none fill-foreground text-[9px] font-semibold"
-                  >
-                    {m.name.length > 8 ? m.regionName.split(' ').slice(-2).join(' ') : m.name}
-                  </text>
-                </g>
-              )
-            })}
-          </svg>
-        </div>
-        <div className="mt-2 flex flex-wrap items-center justify-center gap-x-4 gap-y-1 px-2 pb-1 text-xs text-muted-foreground">
+      <div className="overflow-hidden rounded-3xl border border-border bg-card">
+        <div
+          ref={containerRef}
+          className={cn(
+            'h-[420px] w-full lg:h-[70vh]',
+            // 다크모드에서 타일이 눈부시지 않도록 살짝 눌러준다.
+            resolvedTheme === 'dark' && 'leaflet-dark'
+          )}
+        />
+        <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1 border-t border-border px-2 py-2 text-xs text-muted-foreground">
           {Object.entries({
             부녀회: '#FEE500',
             청년회: '#34d399',
@@ -268,4 +241,21 @@ export function KoreaVillageMap({
       </div>
     </div>
   )
+}
+
+function escapeHtml(s: string) {
+  return s.replace(/[&<>"']/g, (ch) => {
+    switch (ch) {
+      case '&':
+        return '&amp;'
+      case '<':
+        return '&lt;'
+      case '>':
+        return '&gt;'
+      case '"':
+        return '&quot;'
+      default:
+        return '&#39;'
+    }
+  })
 }

@@ -166,3 +166,51 @@ input[type="number"]::-webkit-inner-spin-button {
   -webkit-appearance: none;
   margin: 0;
 }
+
+/* ── 마을 지도 (Leaflet) ───────────────────────────────── */
+
+/* Leaflet 컨테이너가 카드 배경과 어울리도록 */
+.leaflet-container {
+  background: var(--muted);
+  font-family: inherit;
+}
+
+/* 다크모드에서 OSM 타일이 너무 밝지 않도록 눌러준다 */
+.leaflet-dark .leaflet-tile-pane {
+  filter: brightness(0.7) contrast(1.05) saturate(0.85);
+}
+
+/* 마커: 색 점 + 마을 이름 라벨 */
+.village-marker {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.village-marker__dot {
+  width: 14px;
+  height: 14px;
+  border-radius: 9999px;
+  border: 2px solid #fff;
+  box-shadow: 0 1px 3px rgb(0 0 0 / 0.4);
+  transition: transform 120ms ease;
+}
+
+.village-marker__label {
+  position: absolute;
+  bottom: 18px;
+  left: 50%;
+  transform: translateX(-50%);
+  white-space: nowrap;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--foreground);
+  background: color-mix(in oklab, var(--background) 85%, transparent);
+  padding: 1px 5px;
+  border-radius: 6px;
+  pointer-events: none;
+}
+
+.village-marker--active .village-marker__dot {
+  transform: scale(1.5);
+}
