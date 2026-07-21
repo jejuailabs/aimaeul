@@ -1,11 +1,11 @@
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
-import { Calendar, Camera, ChevronRight, Gamepad2, MapPin, MessageCircle, Users, Building2, Plus } from 'lucide-react'
+import { Calendar, Camera, ChevronRight, Gamepad2, MapPin, MessageCircle, Sparkles, Users, Building2, Plus } from 'lucide-react'
 import { getCurrentUser } from '@/lib/session'
 import { adminDb } from '@/lib/firebase-admin'
 import { AppShell } from '@/components/app-shell'
 import { CommunityBadge } from '@/components/community-badge'
-import { InviteLinkCard } from '@/components/invite-link-card'
+import { InviteLinkButton } from '@/components/invite-link-button'
 import { PhotoWithExif } from '@/components/exif-overlay'
 import { Button } from '@/components/ui/button'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
@@ -36,6 +36,9 @@ export default async function MemberHomePage({
     photosResult,
     upcomingEventsResult,
     recentMessagesResult,
+    digestDoc,
+    historySnap,
+    vacantCountSnap,
   ] = await Promise.all([
     commRef.get(),
     adminDb.collection('users').where('communityIds', 'array-contains', activeId).count().get(),
@@ -49,6 +52,23 @@ export default async function MemberHomePage({
       .limit(3)
       .get(),
     commRef.collection('messages').orderBy('createdAt', 'desc').limit(5).get(),
+    // 마을 홈페이지에만 있던 내용을 이 화면으로 합친다.
+    adminDb
+      .collection('dailyDigests')
+      .doc(`${activeId}_${new Date().toISOString().slice(0, 10)}`)
+      .get(),
+    adminDb
+      .collection('villageHistory')
+      .where('communityId', '==', activeId)
+      .orderBy('date', 'desc')
+      .limit(1)
+      .get(),
+    adminDb
+      .collection('vacantHouses')
+      .where('communityId', '==', activeId)
+      .where('status', '==', '게시중')
+      .count()
+      .get(),
   ])
   if (!communityDoc.exists) redirect('/app/home')
   const community = communityDoc.data()!
@@ -58,6 +78,10 @@ export default async function MemberHomePage({
     photos: photosSnap.data().count,
     events: eventsSnap.data().count,
   }
+
+  const todayDigest = digestDoc.exists ? digestDoc.data() : null
+  const latestHistory = historySnap.empty ? null : historySnap.docs[0].data()
+  const vacantCount = vacantCountSnap.data().count
 
   const photos = photosResult.docs.map((doc) => ({ id: doc.id, ...doc.data() }))
   const upcomingEvents = upcomingEventsResult.docs.map((doc) => ({ id: doc.id, ...doc.data() }))
@@ -77,7 +101,17 @@ export default async function MemberHomePage({
   const meta = communityTypeMeta(community.communityType)
 
   return (
-    <AppShell title="마을홈">
+    <AppShell
+      title="마을홈"
+      right={
+        community.inviteCode ? (
+          <InviteLinkButton
+            inviteCode={community.inviteCode}
+            communityName={community.name}
+          />
+        ) : undefined
+      }
+    >
       <div className="px-3 py-3">
         {/* Community switcher */}
         {user.communities.length > 1 && (
@@ -123,13 +157,12 @@ export default async function MemberHomePage({
           </div>
         </div>
 
-        {/* Quick actions */}
-        <div className="mt-3 grid grid-cols-4 gap-2">
+        {/* 바로가기 — 사진과 홈페이지는 이 화면에 합쳐서 따로 두지 않는다 */}
+        <div className="mt-3 grid grid-cols-3 gap-2">
           {[
             { href: `/app/chat/${activeId}`, icon: MessageCircle, label: '채팅' },
-            { href: `/app/photos?c=${activeId}`, icon: Camera, label: '사진' },
-            { href: `/app/games?communityId=${activeId}`, icon: Gamepad2, label: '게임' },
-            { href: `/village/${activeId}`, icon: Building2, label: '홈페이지' },
+            { href: `/village/${activeId}/timeline`, icon: Camera, label: '타임라인' },
+            { href: `/village/${activeId}/history`, icon: Building2, label: '마을 역사' },
           ].map((a) => (
             <Link
               key={a.href}
@@ -144,14 +177,55 @@ export default async function MemberHomePage({
           ))}
         </div>
 
-        {/* 초대 링크 — 코드 입력이 어려운 회원을 위해 링크 한 번으로 참여 */}
-        {community.inviteCode && (
-          <div className="mt-3">
-            <InviteLinkCard
-              inviteCode={community.inviteCode}
-              communityName={community.name}
-            />
-          </div>
+        {/* 오늘의 마을 소식 (AI 신문) — 마을 홈페이지에 있던 내용을 합쳤다 */}
+        {todayDigest && (
+          <Link
+            href={`/village/${activeId}/news/${todayDigest.date}`}
+            className="mt-3 block rounded-2xl border border-primary/40 bg-primary/5 p-3 transition-colors hover:bg-primary/10"
+          >
+            <p className="flex items-center gap-1.5 text-sm font-semibold">
+              <Sparkles className="h-4 w-4 text-primary" /> 오늘의 마을 소식
+            </p>
+            <p className="mt-1 line-clamp-2 whitespace-pre-line text-xs text-muted-foreground">
+              {todayDigest.summaryText}
+            </p>
+          </Link>
+        )}
+
+        {/* 마을 역사 */}
+        {latestHistory && (
+          <Link
+            href={`/village/${activeId}/history`}
+            className="mt-2 flex items-center gap-3 rounded-2xl border border-border bg-card p-3 transition-colors hover:bg-muted/40"
+          >
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary/15 text-base">
+              📜
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-semibold">마을 역사</p>
+              <p className="truncate text-xs text-muted-foreground">
+                {latestHistory.title ?? latestHistory.summary ?? '기록을 확인해보세요'}
+              </p>
+            </div>
+            <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
+          </Link>
+        )}
+
+        {/* 빈집소개 */}
+        {vacantCount > 0 && (
+          <Link
+            href={`/village/${activeId}/vacant-houses`}
+            className="mt-2 flex items-center gap-3 rounded-2xl border border-border bg-card p-3 transition-colors hover:bg-muted/40"
+          >
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary/15 text-base">
+              🏠
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-semibold">우리동네 빈집소개</p>
+              <p className="text-xs text-muted-foreground">{vacantCount}곳</p>
+            </div>
+            <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
+          </Link>
         )}
 
         {/* Upcoming events */}
@@ -183,13 +257,16 @@ export default async function MemberHomePage({
           </section>
         )}
 
-        {/* Recent photos */}
+        {/* 마을 사진 — 격자 대신 SNS 피드 형식으로 크게 보여준다 */}
         <section className="mt-5">
           <div className="mb-2 flex items-center justify-between">
             <h3 className="flex items-center gap-1.5 text-sm font-bold">
-              <Camera className="h-4 w-4 text-primary" /> 최근 사진
+              <Camera className="h-4 w-4 text-primary" /> 마을 사진
             </h3>
-            <Link href={`/app/photos?c=${activeId}`} className="text-xs text-muted-foreground hover:underline">
+            <Link
+              href={`/village/${activeId}/timeline`}
+              className="text-xs text-muted-foreground hover:underline"
+            >
               전체보기 <ChevronRight className="inline h-3 w-3" />
             </Link>
           </div>
@@ -198,16 +275,38 @@ export default async function MemberHomePage({
               아직 사진이 없어요. 채팅방에서 올려보세요!
             </div>
           ) : (
-            <div className="grid grid-cols-3 gap-1.5">
-              {photos.slice(0, 6).map((p: any) => (
-                <PhotoWithExif
+            <div className="space-y-4">
+              {photos.map((p: any) => (
+                <article
                   key={p.id}
-                  src={p.thumbnailUrl || p.storageUrl}
-                  alt={p.aiCaption || p.uploaderName}
-                  exif={{ takenAt: p.exif?.takenAt ?? p.exifTakenAt, device: p.exif?.deviceModel ?? p.exifDevice }}
-                  rounded
-                  className="aspect-square"
-                />
+                  className="overflow-hidden rounded-2xl border border-border bg-card"
+                >
+                  <div className="flex items-center gap-2 px-3 py-2.5">
+                    <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/20 text-xs font-semibold">
+                      {(p.uploaderName ?? '?').slice(0, 1)}
+                    </div>
+                    <span className="truncate text-sm font-semibold">
+                      {p.uploaderName ?? '익명'}
+                    </span>
+                    {p.createdAt && (
+                      <span className="ml-auto shrink-0 text-[11px] text-muted-foreground">
+                        {relativeTime(toDate(p.createdAt))}
+                      </span>
+                    )}
+                  </div>
+                  <PhotoWithExif
+                    src={p.thumbnailUrl || p.storageUrl}
+                    alt={p.aiCaption || p.uploaderName}
+                    exif={{
+                      takenAt: p.exif?.takenAt ?? p.exifTakenAt,
+                      device: p.exif?.deviceModel ?? p.exifDevice,
+                      location: p.exifAddress ?? null,
+                    }}
+                  />
+                  {p.aiCaption && (
+                    <p className="px-3 py-2.5 text-sm">{p.aiCaption}</p>
+                  )}
+                </article>
               ))}
             </div>
           )}

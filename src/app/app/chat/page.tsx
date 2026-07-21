@@ -17,6 +17,12 @@ export default async function ChatListPage() {
   if (!user) redirect('/login?callbackUrl=/app/chat')
   if (user.communities.length === 0) redirect('/onboarding')
 
+  // 마을이 하나뿐이면 목록을 한 번 더 고르게 할 이유가 없다.
+  // 채팅을 누르면 익숙한 채팅방이 바로 열리도록 한다.
+  if (user.communities.length === 1) {
+    redirect(`/app/chat/${user.communities[0].id}`)
+  }
+
   // 방마다 4번을 순차로 기다리면 마을 수 × 왕복 시간이 그대로 로딩이 된다.
   // 방 안의 조회도 전부 병렬로 돌리고, 인원수는 문서를 읽지 않고 집계만 한다.
   const rooms = await Promise.all(

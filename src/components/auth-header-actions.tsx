@@ -28,27 +28,24 @@ export async function AuthHeaderActions({
     )
   }
 
-  return (
-    <div className="flex items-center gap-2">
-      {user.communities.length > 0 ? (
-        <Button asChild size="sm" className="rounded-full">
-          <Link href={chatHref}>
-            <LinkPending className="mr-1" /><MessageCircle className="mr-1 h-4 w-4" /> 채팅 앱으로
-          </Link>
-        </Button>
-      ) : (
-        <Button asChild size="sm" className="rounded-full">
-          <Link href="/onboarding">
-            <LinkPending className="mr-1" /><Plus className="mr-1 h-4 w-4" /> 마을 참여하기
-          </Link>
-        </Button>
-      )}
-      <Button asChild size="sm" variant="outline" className="rounded-full">
-        <Link href="/app/me">
-          <LinkPending className="mr-1" /><User className="mr-1 h-4 w-4" />
-          <span className="hidden sm:inline">내 정보</span>
+  // "내 정보"는 하단 메뉴에 이미 있다. 여기까지 두면 헤더가 한쪽으로 쏠린다.
+  if (user.communities.length > 0) {
+    return (
+      <Button asChild size="sm" className="rounded-full">
+        <Link href={chatHref}>
+          <LinkPending className="mr-1" />
+          <MessageCircle className="mr-1 h-4 w-4" /> 채팅 앱으로
         </Link>
       </Button>
-    </div>
+    )
+  }
+
+  return (
+    <Button asChild size="sm" className="rounded-full">
+      <Link href="/onboarding">
+        <LinkPending className="mr-1" />
+        <Plus className="mr-1 h-4 w-4" /> 마을 참여하기
+      </Link>
+    </Button>
   )
 }

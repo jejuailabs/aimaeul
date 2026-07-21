@@ -13,6 +13,7 @@ import {
   Circle,
   X,
   Loader2,
+  NotebookPen,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -394,6 +395,19 @@ export function ChatRoomClient({
               </div>
             </PopoverContent>
           </Popover>
+
+          {/* 일기장 — 이모티콘 옆에서 바로 연다 */}
+          <Button
+            asChild
+            variant="ghost"
+            size="icon"
+            className="h-10 w-10 shrink-0 rounded-full text-muted-foreground"
+            aria-label="일기장"
+          >
+            <Link href="/app/diary">
+              <NotebookPen className="h-5 w-5" />
+            </Link>
+          </Button>
 
           {/* 회원에게는 게임 아이콘을 아예 보이지 않게 한다 */}
           {canRunGame && (
