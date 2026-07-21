@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { LogOut, Plus, MapPin, Megaphone, Building2, Smile, ChevronRight, UserCheck, PlusCircle } from 'lucide-react'
+import { LogOut, Plus, MapPin, Megaphone, Building2, Smile, ChevronRight, UserCheck, PlusCircle, LayoutDashboard } from 'lucide-react'
 import { ViewModeSwitcher } from '@/components/view-mode-switcher'
 import { AppShell } from '@/components/app-shell'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
@@ -135,6 +135,16 @@ export default function MePage() {
           </Link>
 
           <ViewModeSwitcher />
+
+          {isSuperadmin && (
+            <Link
+              href="/app/admin"
+              className="flex items-center gap-3 rounded-2xl border border-primary/40 bg-primary/5 p-3 transition-colors hover:bg-primary/10"
+            >
+              <LayoutDashboard className="h-5 w-5 text-primary" />
+              <span className="text-sm font-medium">운영자 대시보드</span>
+            </Link>
+          )}
 
           {isSuperadmin && (
             <Link
