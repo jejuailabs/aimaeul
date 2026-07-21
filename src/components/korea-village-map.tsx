@@ -7,6 +7,7 @@ import { useTheme } from 'next-themes'
 import { Search, MapPin, Users, ArrowUpRight } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { CommunityBadge } from '@/components/community-badge'
+import { LinkPendingOverlay } from '@/components/link-pending'
 import { communityTypeMeta } from '@/lib/village'
 import { cn } from '@/lib/utils'
 import 'leaflet/dist/leaflet.css'
@@ -211,10 +212,11 @@ export function KoreaVillageMap({ communities }: { communities: PublicCommunity[
                 onMouseEnter={() => setActive(c.id)}
                 onMouseLeave={() => setActive(null)}
                 className={cn(
-                  'group flex gap-3 rounded-2xl border bg-card p-3 transition-all hover:-translate-y-0.5 hover:shadow-md',
+                  'group relative flex gap-3 rounded-2xl border bg-card p-3 transition-all hover:-translate-y-0.5 hover:shadow-md',
                   active === c.id ? 'border-primary ring-2 ring-primary/20' : 'border-border'
                 )}
               >
+                <LinkPendingOverlay />
                 <div
                   className="relative h-16 w-16 shrink-0 overflow-hidden rounded-xl bg-muted"
                   style={{ boxShadow: `inset 0 0 0 2px ${meta.color}55` }}

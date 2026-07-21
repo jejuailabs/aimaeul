@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { LogOut, Plus, MapPin, Megaphone, Building2, Smile, ChevronRight, UserCheck, PlusCircle, LayoutDashboard } from 'lucide-react'
 import { ViewModeSwitcher } from '@/components/view-mode-switcher'
+import { LinkPendingOverlay } from '@/components/link-pending'
 import { AppShell } from '@/components/app-shell'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
@@ -83,8 +84,9 @@ export default function MePage() {
                 <Link
                   key={c.id}
                   href={`/app/chat/${c.id}`}
-                  className="flex items-center justify-between gap-3 rounded-2xl border border-border bg-card p-3 transition-colors hover:bg-muted/40"
+                  className="relative flex items-center justify-between gap-3 rounded-2xl border border-border bg-card p-3 transition-colors hover:bg-muted/40"
                 >
+                  <LinkPendingOverlay />
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2">
                       <p className="truncate font-semibold">{c.name}</p>
@@ -112,24 +114,27 @@ export default function MePage() {
 
           <Link
             href="/onboarding"
-            className="flex items-center gap-3 rounded-2xl border border-border bg-card p-3 transition-colors hover:bg-muted/40"
+            className="relative flex items-center gap-3 rounded-2xl border border-border bg-card p-3 transition-colors hover:bg-muted/40"
           >
+            <LinkPendingOverlay />
             <Plus className="h-5 w-5 text-muted-foreground" />
             <span className="text-sm font-medium">새 마을 참여하기</span>
           </Link>
 
           <Link
             href="/app/report"
-            className="flex items-center gap-3 rounded-2xl border border-border bg-card p-3 transition-colors hover:bg-muted/40"
+            className="relative flex items-center gap-3 rounded-2xl border border-border bg-card p-3 transition-colors hover:bg-muted/40"
           >
+            <LinkPendingOverlay />
             <Megaphone className="h-5 w-5 text-muted-foreground" />
             <span className="text-sm font-medium">제보하기</span>
           </Link>
 
           <Link
             href="/app/vacant-houses"
-            className="flex items-center gap-3 rounded-2xl border border-border bg-card p-3 transition-colors hover:bg-muted/40"
+            className="relative flex items-center gap-3 rounded-2xl border border-border bg-card p-3 transition-colors hover:bg-muted/40"
           >
+            <LinkPendingOverlay />
             <Building2 className="h-5 w-5 text-muted-foreground" />
             <span className="text-sm font-medium">빈집소개</span>
           </Link>
@@ -139,8 +144,9 @@ export default function MePage() {
           {isSuperadmin && (
             <Link
               href="/app/admin"
-              className="flex items-center gap-3 rounded-2xl border border-primary/40 bg-primary/5 p-3 transition-colors hover:bg-primary/10"
+              className="relative flex items-center gap-3 rounded-2xl border border-primary/40 bg-primary/5 p-3 transition-colors hover:bg-primary/10"
             >
+              <LinkPendingOverlay />
               <LayoutDashboard className="h-5 w-5 text-primary" />
               <span className="text-sm font-medium">운영자 대시보드</span>
             </Link>
@@ -149,8 +155,9 @@ export default function MePage() {
           {isSuperadmin && (
             <Link
               href="/app/admin/communities/new"
-              className="flex items-center gap-3 rounded-2xl border border-primary/40 bg-primary/5 p-3 transition-colors hover:bg-primary/10"
+              className="relative flex items-center gap-3 rounded-2xl border border-primary/40 bg-primary/5 p-3 transition-colors hover:bg-primary/10"
             >
+              <LinkPendingOverlay />
               <PlusCircle className="h-5 w-5 text-primary" />
               <span className="text-sm font-medium">새 마을 만들기</span>
             </Link>
@@ -159,8 +166,9 @@ export default function MePage() {
           {canManageMembers && (
             <Link
               href="/app/admin/members"
-              className="flex items-center gap-3 rounded-2xl border border-primary/40 bg-primary/5 p-3 transition-colors hover:bg-primary/10"
+              className="relative flex items-center gap-3 rounded-2xl border border-primary/40 bg-primary/5 p-3 transition-colors hover:bg-primary/10"
             >
+              <LinkPendingOverlay />
               <UserCheck className="h-5 w-5 text-primary" />
               <span className="text-sm font-medium">가입 승인 관리</span>
             </Link>
@@ -168,8 +176,9 @@ export default function MePage() {
 
           <Link
             href="/app/emoji-packs"
-            className="flex items-center gap-3 rounded-2xl border border-border bg-card p-3 transition-colors hover:bg-muted/40"
+            className="relative flex items-center gap-3 rounded-2xl border border-border bg-card p-3 transition-colors hover:bg-muted/40"
           >
+            <LinkPendingOverlay />
             <Smile className="h-5 w-5 text-muted-foreground" />
             <span className="text-sm font-medium">이모티콘 팩 관리</span>
           </Link>

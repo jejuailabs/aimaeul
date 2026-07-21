@@ -7,6 +7,7 @@ import { AppShell } from '@/components/app-shell'
 import { Button } from '@/components/ui/button'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { CommunityBadge } from '@/components/community-badge'
+import { LinkPendingOverlay } from '@/components/link-pending'
 import { relativeTime, communityTypeMeta } from '@/lib/village'
 
 export const dynamic = 'force-dynamic'
@@ -91,8 +92,9 @@ export default async function ChatListPage() {
         {rooms.length > 0 && (
           <Link
             href="/app/town-square"
-            className="mb-2 flex items-center gap-3 rounded-2xl border border-primary/40 bg-primary/5 px-3 py-3 transition-colors hover:bg-primary/10"
+            className="relative mb-2 flex items-center gap-3 rounded-2xl border border-primary/40 bg-primary/5 px-3 py-3 transition-colors hover:bg-primary/10"
           >
+            <LinkPendingOverlay />
             <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-primary/20 text-2xl">
               🏛️
             </div>
@@ -123,8 +125,9 @@ export default async function ChatListPage() {
               <li key={r.id}>
                 <Link
                   href={`/app/chat/${r.id}`}
-                  className="flex items-center gap-3 px-3 py-3 transition-colors hover:bg-muted/40"
+                  className="relative flex items-center gap-3 px-3 py-3 transition-colors hover:bg-muted/40"
                 >
+                  <LinkPendingOverlay />
                   <div className="relative shrink-0">
                     <Avatar className="h-12 w-12 rounded-2xl">
                       <AvatarImage src={r.coverImageUrl || undefined} alt={r.name} />

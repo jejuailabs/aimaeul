@@ -41,18 +41,9 @@ function LoginContent() {
   async function handleGoogleLogin() {
     setSigningIn(true)
     try {
+      // 세션 쿠키 생성은 auth-context의 onAuthStateChanged에서 처리한다.
+      // 모바일(리다이렉트)에서는 이 아래 코드가 실행되지 않기 때문이다.
       await signInWithGoogle()
-      const { getAuth } = await import('firebase/auth')
-      const currentUser = getAuth().currentUser
-      if (currentUser) {
-        const idToken = await currentUser.getIdToken()
-        await fetch('/api/auth/session', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ idToken }),
-        })
-      }
-      toast.success('로그인 성공!')
     } catch (e: any) {
       if (e?.code !== 'auth/popup-closed-by-user') {
         toast.error('로그인에 실패했어요. 다시 시도해주세요.')

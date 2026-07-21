@@ -2,6 +2,7 @@ import Link from 'next/link'
 import { LogIn, MessageCircle, Plus, User } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { getCurrentUser } from '@/lib/session'
+import { LinkPending } from '@/components/link-pending'
 
 /**
  * 공개 화면(지도·마을 홈페이지) 우상단 인증 버튼.
@@ -21,7 +22,7 @@ export async function AuthHeaderActions({
     return (
       <Button asChild size="sm" className="rounded-full">
         <Link href="/login">
-          <LogIn className="mr-1 h-4 w-4" /> 로그인
+          <LinkPending className="mr-1" /><LogIn className="mr-1 h-4 w-4" /> 로그인
         </Link>
       </Button>
     )
@@ -32,19 +33,19 @@ export async function AuthHeaderActions({
       {user.communities.length > 0 ? (
         <Button asChild size="sm" className="rounded-full">
           <Link href={chatHref}>
-            <MessageCircle className="mr-1 h-4 w-4" /> 채팅 앱으로
+            <LinkPending className="mr-1" /><MessageCircle className="mr-1 h-4 w-4" /> 채팅 앱으로
           </Link>
         </Button>
       ) : (
         <Button asChild size="sm" className="rounded-full">
           <Link href="/onboarding">
-            <Plus className="mr-1 h-4 w-4" /> 마을 참여하기
+            <LinkPending className="mr-1" /><Plus className="mr-1 h-4 w-4" /> 마을 참여하기
           </Link>
         </Button>
       )}
       <Button asChild size="sm" variant="outline" className="rounded-full">
         <Link href="/app/me">
-          <User className="mr-1 h-4 w-4" />
+          <LinkPending className="mr-1" /><User className="mr-1 h-4 w-4" />
           <span className="hidden sm:inline">내 정보</span>
         </Link>
       </Button>

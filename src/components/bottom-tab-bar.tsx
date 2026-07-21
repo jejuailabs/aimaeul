@@ -1,8 +1,8 @@
 'use client'
 
-import Link from 'next/link'
+import Link, { useLinkStatus } from 'next/link'
 import { usePathname } from 'next/navigation'
-import { MessageCircle, Home, Image, Gamepad2, User } from 'lucide-react'
+import { MessageCircle, Home, Image, Gamepad2, User, Loader2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 const TABS = [
@@ -12,6 +12,20 @@ const TABS = [
   { href: '/app/games', label: '게임', icon: Gamepad2 },
   { href: '/app/me', label: '내정보', icon: User },
 ] as const
+
+/** 이동 중이면 아이콘 대신 스피너를 보여준다. Link 안에서만 동작한다. */
+function TabIcon({
+  Icon,
+  active,
+}: {
+  Icon: React.ComponentType<{ className?: string }>
+  active: boolean
+}) {
+  const { pending } = useLinkStatus()
+  const cls = cn('h-5 w-5', active && 'text-primary-foreground')
+  if (pending) return <Loader2 className={cn(cls, 'animate-spin')} />
+  return <Icon className={cls} />
+}
 
 export function BottomTabBar() {
   const pathname = usePathname()
@@ -43,7 +57,8 @@ export function BottomTabBar() {
                   active && 'bg-primary'
                 )}
               >
-                <Icon className={cn('h-5 w-5', active && 'text-primary-foreground')} />
+                {/* 눌린 즉시 스피너로 바뀌어 반응이 보이게 한다 */}
+                <TabIcon Icon={Icon} active={active} />
               </div>
               <span className={cn(active && 'font-semibold')}>{tab.label}</span>
             </Link>
