@@ -143,6 +143,15 @@ export default async function MemberHomePage({
             <div className="flex h-36 items-center justify-center bg-muted text-5xl">{meta.emoji}</div>
           )}
           <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent" />
+          {/* 마스코트가 있으면 배너 위에 함께 보여준다 */}
+          {community.mascotImageUrl && (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={community.mascotImageUrl}
+              alt={`${community.name} 마스코트`}
+              className="absolute bottom-2 right-3 h-24 w-24 object-contain drop-shadow-lg"
+            />
+          )}
           <div className="absolute inset-x-0 bottom-0 p-3 text-white">
             <div className="mb-1 flex items-center gap-2">
               <CommunityBadge type={community.communityType} size="sm" />

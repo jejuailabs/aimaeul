@@ -14,6 +14,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
+import { CommunityImageEditor } from '@/components/community-image-editor'
 import { relativeTime } from '@/lib/village'
 import { cn } from '@/lib/utils'
 import { toast } from 'sonner'
@@ -42,6 +43,8 @@ type Community = {
   communityType: string
   regionName: string
   inviteCode: string
+  coverImageUrl: string | null
+  mascotImageUrl: string | null
 }
 
 const TABS = [
@@ -166,6 +169,20 @@ export function ManageCommunityClient({
             초대코드 <span className="font-mono font-bold">{community.inviteCode}</span>
           </p>
         )}
+      </div>
+
+      {/* 배너·마스코트 */}
+      <div className="mb-4 space-y-3">
+        <CommunityImageEditor
+          communityId={community.id}
+          kind="banner"
+          initialUrl={community.coverImageUrl}
+        />
+        <CommunityImageEditor
+          communityId={community.id}
+          kind="mascot"
+          initialUrl={community.mascotImageUrl}
+        />
       </div>
 
       {/* 탭 */}

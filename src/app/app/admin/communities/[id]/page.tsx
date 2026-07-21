@@ -46,6 +46,8 @@ export default async function ManageCommunityPage({
           communityType: c.communityType ?? '',
           regionName: c.regionName ?? '',
           inviteCode: c.inviteCode ?? '',
+          coverImageUrl: c.coverImageUrl ?? null,
+          mascotImageUrl: c.mascotImageUrl ?? null,
         }}
         isSuperadmin={user.role === 'superadmin'}
       />
