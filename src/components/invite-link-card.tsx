@@ -37,10 +37,11 @@ export function InviteLinkCard({
   }
 
   async function share() {
-    const text = `[${communityName}] 우리 마을 채팅방에 초대합니다.\n아래 링크를 누르면 바로 들어올 수 있어요.\n${link}`
     if (navigator.share) {
       try {
-        await navigator.share({ title: communityName, text, url: link })
+        // text를 함께 넘기면 공유 시트에서 "복사"를 골랐을 때
+        // 안내 문구까지 통째로 복사된다. 주소만 넘긴다.
+        await navigator.share({ title: communityName, url: link })
         return
       } catch {
         // 사용자가 공유를 취소한 경우 등 — 복사로 대체하지 않고 조용히 종료
