@@ -96,14 +96,16 @@ export function TownSquareClient({
     }
   }
 
+  // 100vh는 모바일 툴바 영역까지 포함해 입력창이 밀려난다.
+  // 실제로 보이는 높이(dvh)를 써야 처음부터 입력창이 보인다.
   return (
-    <div className="flex h-[calc(100vh-8rem)] flex-col">
+    <div className="flex h-[calc(100dvh-8rem)] flex-col">
       <p className="border-b border-border bg-muted/30 px-3 py-2 text-[11px] text-muted-foreground">
         전국 마을 이웃들이 함께 쓰는 공간이에요. 마을과 이름이 함께 표시됩니다.
       </p>
 
       {/* 메시지 목록 */}
-      <div className="flex-1 space-y-3 overflow-y-auto px-3 py-3">
+      <div className="min-h-0 flex-1 space-y-3 overflow-y-auto px-3 py-3">
         {loading ? (
           <div className="flex justify-center py-10">
             <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
@@ -159,7 +161,7 @@ export function TownSquareClient({
       </div>
 
       {/* 입력 */}
-      <form onSubmit={send} className="border-t border-border bg-background px-3 py-2">
+      <form onSubmit={send} className="shrink-0 border-t border-border bg-background px-3 py-2 pb-safe">
         {communities.length > 1 && (
           <div className="mb-2 flex items-center gap-1.5 overflow-x-auto pb-1">
             <span className="shrink-0 text-[11px] text-muted-foreground">이름 표시:</span>

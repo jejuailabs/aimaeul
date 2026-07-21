@@ -232,8 +232,11 @@ export function ChatRoomClient({
     setEmojiPacksLoaded(true)
   }
 
+  // h-screen(100vh)은 모바일 브라우저에서 주소창·툴바 영역까지 포함해
+  // 입력창이 화면 밖으로 밀려 스크롤해야 나타났다.
+  // 100dvh는 실제로 보이는 높이만 잡아 처음부터 입력창이 보인다.
   return (
-    <div className="flex h-screen flex-col bg-background">
+    <div className="flex h-[100dvh] flex-col overflow-hidden bg-background">
       {/* Header */}
       <header className="sticky top-0 z-30 flex h-14 items-center gap-2 border-b border-border/60 bg-background/95 px-2 backdrop-blur">
         <Button variant="ghost" size="icon" className="rounded-full" onClick={() => router.back()} aria-label="뒤로">
@@ -271,7 +274,8 @@ export function ChatRoomClient({
       </header>
 
       {/* Messages */}
-      <div ref={scrollRef} className="flex-1 overflow-y-auto px-3 py-3">
+      {/* min-h-0이 없으면 flex 컬럼에서 이 칸이 줄지 않아 입력창을 밀어낸다 */}
+      <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto px-3 py-3">
         <div className="mx-auto flex max-w-2xl flex-col gap-2">
           {messages.length === 0 && (
             <div className="py-16 text-center text-sm text-muted-foreground">
@@ -300,7 +304,7 @@ export function ChatRoomClient({
       </div>
 
       {/* Input bar */}
-      <div className="border-t border-border/60 bg-background/95 px-2 py-2 pb-safe backdrop-blur">
+      <div className="shrink-0 border-t border-border/60 bg-background/95 px-2 py-2 pb-safe backdrop-blur">
         <div className="mx-auto flex max-w-2xl items-end gap-1.5">
           <input
             ref={fileInputRef}
