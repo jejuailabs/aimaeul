@@ -11,7 +11,7 @@ export const dynamic = 'force-dynamic'
 
 const MAX_BYTES = 20 * 1024 * 1024
 const ANTHROPIC_API_URL = 'https://api.anthropic.com/v1/messages'
-const AI_MODEL = 'claude-sonnet-4-20250514'
+const AI_MODEL = 'claude-sonnet-5'
 
 /**
  * Fire-and-forget: reverse geocode GPS coordinates via Nominatim (OpenStreetMap).

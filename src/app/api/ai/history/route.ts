@@ -6,7 +6,7 @@ import { FieldValue } from 'firebase-admin/firestore'
 export const dynamic = 'force-dynamic'
 
 const ANTHROPIC_API_URL = 'https://api.anthropic.com/v1/messages'
-const MODEL = 'claude-sonnet-4-20250514'
+const MODEL = 'claude-sonnet-5'
 
 async function callClaude(systemPrompt: string, userMessage: string): Promise<string | null> {
   const apiKey = process.env.ANTHROPIC_API_KEY

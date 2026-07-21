@@ -2,11 +2,17 @@ import { adminDb } from '@/lib/firebase-admin'
 import { FieldValue } from 'firebase-admin/firestore'
 
 const ANTHROPIC_API_URL = 'https://api.anthropic.com/v1/messages'
-const MODEL = 'claude-sonnet-4-20250514'
+const MODEL = 'claude-sonnet-5'
 
 async function callClaude(systemPrompt: string, userMessage: string): Promise<string | null> {
   const apiKey = process.env.ANTHROPIC_API_KEY
-  if (!apiKey) return null
+  if (!apiKey) {
+    // 조용히 넘어가면 템플릿 문구가 AI 요약인 것처럼 계속 저장된다.
+    console.error(
+      '[digest] ANTHROPIC_API_KEY가 없어 AI 요약을 만들지 못했습니다. 템플릿으로 대체합니다.'
+    )
+    return null
+  }
   try {
     const res = await fetch(ANTHROPIC_API_URL, {
       method: 'POST',

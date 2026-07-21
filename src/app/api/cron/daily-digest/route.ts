@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { verifyCronRequest } from '@/lib/cron-auth'
 import { adminDb } from '@/lib/firebase-admin'
 import { generateDailyDigest } from '@/lib/digest'
 
@@ -6,14 +7,12 @@ export const dynamic = 'force-dynamic'
 export const maxDuration = 300 // 5 min for processing all communities
 
 export async function GET(req: Request) {
-  // Verify Vercel Cron secret if configured
-  const cronSecret = process.env.CRON_SECRET
-  if (cronSecret) {
-    const authHeader = req.headers.get('authorization')
-    if (authHeader !== `Bearer ${cronSecret}`) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-  }
+  // 인증 실패 시 막는다(fail closed).
+  //
+  // 예전에는 CRON_SECRET이 없으면 검사를 통째로 건너뛰어, 누구나 이 주소를
+  // 반복 호출해 Claude API 비용을 발생시킬 수 있었다.
+  const authError = verifyCronRequest(req)
+  if (authError) return authError
 
   // Use yesterday's date as the target
   const yesterday = new Date()
