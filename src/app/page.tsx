@@ -63,14 +63,12 @@ export default async function Home() {
         {/* 지도(모바일 1/3) → 마을 소식(1/3, 내부 스크롤) → 마을 목록 */}
         <KoreaVillageMap communities={publicCommunities}>
           <section>
-            <div className="mb-2 flex items-center justify-between">
+            {/* 스크롤해도 제목이 남도록 고정 */}
+            <div className="sticky top-0 z-10 mb-2 flex items-center justify-between bg-muted/20 pb-1 backdrop-blur">
               <h2 className="text-base font-black">지금 마을에서는</h2>
               <span className="text-[11px] text-muted-foreground">전국 마을 최신 소식</span>
             </div>
-            {/* 소식은 이 영역 안에서만 스크롤된다 */}
-            <div className="max-h-[33vh] overflow-y-auto rounded-2xl border border-border bg-muted/20 p-2 lg:max-h-[60vh]">
-              <GlobalFeed feed={feed} />
-            </div>
+            <GlobalFeed feed={feed} />
           </section>
         </KoreaVillageMap>
 

@@ -166,12 +166,12 @@ export function KoreaVillageMap({
   }, [active])
 
   const mapPanel = (
-    <div className="overflow-hidden rounded-3xl border border-border bg-card">
+    // 소식 영역과 높이를 맞추기 위해 컨테이너가 높이를 갖고 지도가 남은 공간을 채운다.
+    <div className="flex h-full flex-col overflow-hidden rounded-3xl border border-border bg-card">
         <div
           ref={containerRef}
           className={cn(
-            // 모바일에서는 화면의 1/3 정도만 차지하게 해 아래 소식이 함께 보이도록 한다.
-            'h-[33vh] w-full lg:h-[70vh]',
+            'w-full flex-1',
             // 다크모드에서 타일이 눈부시지 않도록 살짝 눌러준다.
             resolvedTheme === 'dark' && 'leaflet-dark'
           )}
@@ -204,77 +204,87 @@ export function KoreaVillageMap({
           />
         </div>
 
-        <div className="space-y-3 lg:max-h-[70vh] lg:overflow-y-auto lg:pr-1">
-          {filtered.length === 0 && (
-            <div className="rounded-2xl border border-dashed border-border p-8 text-center text-sm text-muted-foreground">
-              검색된 마을이 없어요.
-            </div>
-          )}
-          {filtered.map((c) => {
-            const meta = communityTypeMeta(c.communityType)
-            return (
-              <Link
-                key={c.id}
-                href={`/village/${c.id}`}
-                onMouseEnter={() => setActive(c.id)}
-                onMouseLeave={() => setActive(null)}
-                className={cn(
-                  'group relative flex gap-3 rounded-2xl border bg-card p-3 transition-all hover:-translate-y-0.5 hover:shadow-md',
-                  active === c.id ? 'border-primary ring-2 ring-primary/20' : 'border-border'
-                )}
-              >
-                <LinkPendingOverlay />
-                <div
-                  className="relative h-16 w-16 shrink-0 overflow-hidden rounded-xl bg-muted"
-                  style={{ boxShadow: `inset 0 0 0 2px ${meta.color}55` }}
+        {filtered.length === 0 ? (
+          <div className="rounded-2xl border border-dashed border-border p-8 text-center text-sm text-muted-foreground">
+            검색된 마을이 없어요.
+          </div>
+        ) : (
+          // 정사각 배너를 좌우로 밀어서 넘긴다. 스크롤바는 감추고 스냅을 준다.
+          <div className="-mx-4 flex snap-x snap-mandatory gap-3 overflow-x-auto px-4 pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+            {filtered.map((c) => {
+              const meta = communityTypeMeta(c.communityType)
+              return (
+                <Link
+                  key={c.id}
+                  href={`/village/${c.id}`}
+                  onMouseEnter={() => setActive(c.id)}
+                  onMouseLeave={() => setActive(null)}
+                  className={cn(
+                    'group relative aspect-square w-40 shrink-0 snap-start overflow-hidden rounded-2xl border bg-card transition-all hover:-translate-y-0.5 hover:shadow-md sm:w-48',
+                    active === c.id ? 'border-primary ring-2 ring-primary/20' : 'border-border'
+                  )}
                 >
+                  <LinkPendingOverlay />
+
+                  {/* 배경: 커버 사진이 없으면 공동체 색과 이모지로 채운다 */}
                   {c.coverImageUrl ? (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img
                       src={c.coverImageUrl}
                       alt={c.name}
-                      className="h-full w-full object-cover"
+                      loading="lazy"
+                      className="absolute inset-0 h-full w-full object-cover"
                     />
                   ) : (
-                    <div className="flex h-full w-full items-center justify-center text-2xl">
+                    <div
+                      className="absolute inset-0 flex items-center justify-center text-5xl"
+                      style={{ background: `${meta.color}22` }}
+                    >
                       {meta.emoji}
                     </div>
                   )}
-                </div>
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-start justify-between gap-2">
-                    <h3 className="truncate font-semibold leading-tight">{c.name}</h3>
-                    <ArrowUpRight className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
+
+                  {/* 글자가 읽히도록 아래쪽을 어둡게 깔아준다 */}
+                  <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/75 via-black/45 to-transparent p-2.5 pt-8 text-white">
+                    <div className="flex items-center gap-1.5">
+                      <CommunityBadge type={c.communityType} size="sm" />
+                      {c.memberCount != null && (
+                        <span className="inline-flex items-center gap-0.5 text-[11px] text-white/85">
+                          <Users className="h-3 w-3" /> {c.memberCount}
+                        </span>
+                      )}
+                    </div>
+                    <h3 className="mt-1 truncate text-sm font-bold leading-tight">{c.name}</h3>
+                    <p className="flex items-center gap-1 truncate text-[11px] text-white/80">
+                      <MapPin className="h-3 w-3 shrink-0" />
+                      <span className="truncate">{c.regionName}</span>
+                    </p>
                   </div>
-                  <div className="mt-1 flex items-center gap-1.5 text-xs text-muted-foreground">
-                    <MapPin className="h-3 w-3" />
-                    <span className="truncate">{c.regionName}</span>
-                  </div>
-                  <div className="mt-1.5 flex items-center gap-2">
-                    <CommunityBadge type={c.communityType} size="sm" />
-                    {c.memberCount != null && (
-                      <span className="inline-flex items-center gap-0.5 text-[11px] text-muted-foreground">
-                        <Users className="h-3 w-3" /> {c.memberCount}
-                      </span>
-                    )}
-                  </div>
-                </div>
-              </Link>
-            )
-          })}
-        </div>
+
+                  <ArrowUpRight className="absolute right-2 top-2 h-4 w-4 text-white/80 drop-shadow transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
+                </Link>
+              )
+            })}
+          </div>
+        )}
       </div>
   )
 
-  // 모바일: 지도(1/3) → 마을 소식 → 마을 목록 순으로 쌓는다.
-  // 데스크톱: 지도를 왼쪽에 고정하고 오른쪽에 소식과 목록을 둔다.
+  // 지도와 소식을 같은 높이로 나란히 두고, 마을은 그 아래 정사각 배너로 깐다.
+  // 모바일에서는 지도 → 소식 순으로 쌓이되 높이는 동일하게 유지한다.
   return (
-    <div className="grid gap-6 lg:grid-cols-[1.1fr_1fr] lg:items-start">
-      {mapPanel}
-      <div className="flex flex-col gap-6">
-        {children}
-        {listPanel}
+    <div className="space-y-5">
+      {/* 모바일은 세로로 쌓이므로 각 칸에 높이를 주고,
+          데스크톱에서는 한 줄에 나란히 놓여 같은 높이를 갖는다. */}
+      <div className="grid gap-4 lg:h-[60vh] lg:grid-cols-2">
+        <div className="h-[38vh] lg:h-full">{mapPanel}</div>
+        {/* 소식은 이 칸 안에서만 스크롤된다 */}
+        <div className="h-[38vh] overflow-y-auto rounded-2xl border border-border bg-muted/20 p-2 lg:h-full">
+          {children}
+        </div>
       </div>
+
+      {listPanel}
     </div>
   )
 }
