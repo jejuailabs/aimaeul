@@ -16,9 +16,8 @@ export default async function ChatRoomPage({
   const user = await getCurrentUser()
   if (!user) redirect(`/login?callbackUrl=/app/chat/${communityId}`)
 
-  const commDoc = await adminDb.collection('communities').doc(communityId).get()
-  if (!commDoc.exists) notFound()
-  const community = commDoc.data()!
+  const isMember = user.communities.some((c) => c.id === communityId)
+  if (!isMember) redirect('/app/chat')
 
   // Save the user's last read position for unread badge tracking
   adminDb
@@ -29,16 +28,16 @@ export default async function ChatRoomPage({
     .set({ lastReadAt: FieldValue.serverTimestamp() }, { merge: true })
     .catch(() => { /* best-effort, don't block page render */ })
 
-  const isMember = user.communities.some((c) => c.id === communityId)
-  if (!isMember) redirect('/app/chat')
-
-  const messagesSnap = await adminDb
-    .collection('communities')
-    .doc(communityId)
-    .collection('messages')
-    .orderBy('createdAt', 'asc')
-    .limit(60)
-    .get()
+  // 서로 의존하지 않는 조회를 순차로 기다리면 그 왕복 시간이 전부 더해져
+  // 채팅방 진입이 1~2초씩 걸린다. 한 번에 가져온다.
+  const commRef = adminDb.collection('communities').doc(communityId)
+  const [commDoc, messagesSnap, memberSnap] = await Promise.all([
+    commRef.get(),
+    commRef.collection('messages').orderBy('createdAt', 'asc').limit(60).get(),
+    adminDb.collection('users').where('communityIds', 'array-contains', communityId).get(),
+  ])
+  if (!commDoc.exists) notFound()
+  const community = commDoc.data()!
 
   const messages = messagesSnap.docs.map((doc) => {
     const d = doc.data()
@@ -61,17 +60,18 @@ export default async function ChatRoomPage({
     .map((m) => m.photoId)
     .filter((x): x is string => !!x)
 
+  // 사진을 한 장씩 순차로 읽으면 사진 수만큼 왕복이 늘어난다. 일괄로 가져온다.
   const photoMap: Record<string, PhotoData> = {}
-  for (const pid of photoIds) {
-    const photoDoc = await adminDb
-      .collection('communities')
-      .doc(communityId)
-      .collection('photos')
-      .doc(pid)
-      .get()
+  const photoDocs =
+    photoIds.length > 0
+      ? await adminDb.getAll(
+          ...photoIds.map((pid) => commRef.collection('photos').doc(pid))
+        )
+      : []
+  for (const photoDoc of photoDocs) {
     if (photoDoc.exists) {
       const p = photoDoc.data()!
-      photoMap[pid] = {
+      photoMap[photoDoc.id] = {
         id: photoDoc.id,
         storageUrl: p.storageUrl ?? '',
         thumbnailUrl: p.thumbnailUrl ?? '',
@@ -87,11 +87,7 @@ export default async function ChatRoomPage({
     }
   }
 
-  // 게임 참가자 후보 = 이 마을 회원. 게임 모달에서 쓴다.
-  const memberSnap = await adminDb
-    .collection('users')
-    .where('communityIds', 'array-contains', communityId)
-    .get()
+  // 게임 참가자 후보 = 이 마을 회원. 위에서 병렬로 이미 가져왔다.
   const gameMembers = memberSnap.docs.map((d) => {
     const u = d.data()
     return {

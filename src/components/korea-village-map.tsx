@@ -24,9 +24,9 @@ type PublicCommunity = {
   memberCount?: number
 }
 
-// 대한민국 전체가 들어오는 초기 뷰
-const KOREA_CENTER: [number, number] = [36.3, 127.8]
-const KOREA_ZOOM = 7
+// 기본 뷰는 제주도가 화면 중앙에 오도록 한다.
+const DEFAULT_CENTER: [number, number] = [33.38, 126.55]
+const DEFAULT_ZOOM = 10
 
 // OSM 타일 사용 정책상 출처 표기는 필수다.
 const OSM_URL = 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png'
@@ -79,8 +79,8 @@ export function KoreaVillageMap({
 
         leafletRef.current = L
         const map = L.map(containerRef.current, {
-          center: KOREA_CENTER,
-          zoom: KOREA_ZOOM,
+          center: DEFAULT_CENTER,
+          zoom: DEFAULT_ZOOM,
           scrollWheelZoom: true, // 지도 위에서 스크롤하면 줌
           attributionControl: true,
         })
@@ -276,10 +276,10 @@ export function KoreaVillageMap({
     <div className="space-y-5">
       {/* 모바일은 세로로 쌓이므로 각 칸에 높이를 주고,
           데스크톱에서는 한 줄에 나란히 놓여 같은 높이를 갖는다. */}
-      <div className="grid gap-4 lg:h-[60vh] lg:grid-cols-2">
-        <div className="h-[38vh] lg:h-full">{mapPanel}</div>
+      <div className="grid gap-4 lg:h-[72vh] lg:grid-cols-2">
+        <div className="h-[50vh] lg:h-full">{mapPanel}</div>
         {/* 소식은 이 칸 안에서만 스크롤된다 */}
-        <div className="h-[38vh] overflow-y-auto rounded-2xl border border-border bg-muted/20 p-2 lg:h-full">
+        <div className="h-[50vh] overflow-y-auto rounded-2xl border border-border bg-muted/20 p-2 lg:h-full">
           {children}
         </div>
       </div>

@@ -17,35 +17,32 @@ export default async function ChatListPage() {
   if (!user) redirect('/login?callbackUrl=/app/chat')
   if (user.communities.length === 0) redirect('/onboarding')
 
+  // 방마다 4번을 순차로 기다리면 마을 수 × 왕복 시간이 그대로 로딩이 된다.
+  // 방 안의 조회도 전부 병렬로 돌리고, 인원수는 문서를 읽지 않고 집계만 한다.
   const rooms = await Promise.all(
     user.communities.map(async (c) => {
-      const commDoc = await adminDb.collection('communities').doc(c.id).get()
+      const commRef = adminDb.collection('communities').doc(c.id)
+      const [commDoc, membersCount, messagesSnap, readPosDoc] = await Promise.all([
+        commRef.get(),
+        adminDb
+          .collection('users')
+          .where('communityIds', 'array-contains', c.id)
+          .count()
+          .get(),
+        commRef.collection('messages').orderBy('createdAt', 'desc').limit(1).get(),
+        adminDb
+          .collection('users')
+          .doc(user.uid)
+          .collection('readPositions')
+          .doc(c.id)
+          .get(),
+      ])
       const commData = commDoc.data() || {}
-
-      const membersSnap = await adminDb
-        .collection('users')
-        .where('communityIds', 'array-contains', c.id)
-        .get()
-
-      const messagesSnap = await adminDb
-        .collection('communities')
-        .doc(c.id)
-        .collection('messages')
-        .orderBy('createdAt', 'desc')
-        .limit(1)
-        .get()
-
       const lastMsg = messagesSnap.docs[0]?.data() ?? null
 
       // Check unread: compare last message time with user's last read position
       let hasUnread = false
       if (lastMsg?.createdAt) {
-        const readPosDoc = await adminDb
-          .collection('users')
-          .doc(user.uid)
-          .collection('readPositions')
-          .doc(c.id)
-          .get()
         const lastReadAt = readPosDoc.data()?.lastReadAt?.toDate?.() ?? null
         const lastMsgAt = lastMsg.createdAt?.toDate?.() ?? new Date()
         hasUnread = !lastReadAt || lastMsgAt > lastReadAt
@@ -57,7 +54,7 @@ export default async function ChatListPage() {
         communityType: c.communityType,
         regionName: c.regionName,
         coverImageUrl: commData.coverImageUrl ?? null,
-        memberCount: membersSnap.size,
+        memberCount: membersCount.data().count,
         hasUnread,
         lastMessage: lastMsg
           ? {

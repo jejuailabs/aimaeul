@@ -25,40 +25,39 @@ export default async function MemberHomePage({
   const sp = await searchParams
   const activeId = sp.c && user.communities.some((c) => c.id === sp.c) ? sp.c : user.communities[0].id
 
-  const communityDoc = await adminDb.collection('communities').doc(activeId).get()
+  // 마을 문서 → 카운트 3개 → 목록 3개를 세 단계로 순차 대기하고 있었다.
+  // 서로 의존하지 않으므로 전부 한 번에 가져온다.
+  const commRef = adminDb.collection('communities').doc(activeId)
+  const [
+    communityDoc,
+    membersSnap,
+    photosSnap,
+    eventsSnap,
+    photosResult,
+    upcomingEventsResult,
+    recentMessagesResult,
+  ] = await Promise.all([
+    commRef.get(),
+    adminDb.collection('users').where('communityIds', 'array-contains', activeId).count().get(),
+    commRef.collection('photos').count().get(),
+    commRef.collection('events').count().get(),
+    commRef.collection('photos').orderBy('createdAt', 'desc').limit(6).get(),
+    commRef
+      .collection('events')
+      .where('startAt', '>=', new Date())
+      .orderBy('startAt', 'asc')
+      .limit(3)
+      .get(),
+    commRef.collection('messages').orderBy('createdAt', 'desc').limit(5).get(),
+  ])
   if (!communityDoc.exists) redirect('/app/home')
   const community = communityDoc.data()!
 
-  // Get counts
-  const [membersSnap, photosSnap, eventsSnap] = await Promise.all([
-    adminDb.collection('users').where('communityIds', 'array-contains', activeId).count().get(),
-    adminDb.collection('communities').doc(activeId).collection('photos').count().get(),
-    adminDb.collection('communities').doc(activeId).collection('events').count().get(),
-  ])
   const communityCount = {
     members: membersSnap.data().count,
     photos: photosSnap.data().count,
     events: eventsSnap.data().count,
   }
-
-  const [photosResult, upcomingEventsResult, recentMessagesResult] = await Promise.all([
-    adminDb
-      .collection('communities').doc(activeId).collection('photos')
-      .orderBy('createdAt', 'desc')
-      .limit(6)
-      .get(),
-    adminDb
-      .collection('communities').doc(activeId).collection('events')
-      .where('startAt', '>=', new Date())
-      .orderBy('startAt', 'asc')
-      .limit(3)
-      .get(),
-    adminDb
-      .collection('communities').doc(activeId).collection('messages')
-      .orderBy('createdAt', 'desc')
-      .limit(5)
-      .get(),
-  ])
 
   const photos = photosResult.docs.map((doc) => ({ id: doc.id, ...doc.data() }))
   const upcomingEvents = upcomingEventsResult.docs.map((doc) => ({ id: doc.id, ...doc.data() }))
