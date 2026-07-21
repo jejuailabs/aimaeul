@@ -43,11 +43,14 @@ export function OnboardingClient({
   communities,
   pendingRequests,
   isSuperadmin = false,
+  joinedCommunityIds = [],
 }: {
   communities: PublicCommunity[]
   pendingRequests: PendingRequest[]
   /** 슈퍼관리자는 승인 없이 즉시 참여해 체험할 수 있다. */
   isSuperadmin?: boolean
+  /** 이미 참여 중인 마을. 다시 신청하지 못하게 구분해 보여준다. */
+  joinedCommunityIds?: string[]
 }) {
   const router = useRouter()
   const [tab, setTab] = useState<'search' | 'code'>('search')
@@ -87,6 +90,7 @@ export function OnboardingClient({
   }, [communities, sido, sigungu, type])
 
   const pendingIds = new Set(pending.map((p) => p.communityId))
+  const joinedIds = new Set(joinedCommunityIds)
 
   async function requestJoin(communityId: string) {
     setRequesting(communityId)
@@ -313,6 +317,7 @@ export function OnboardingClient({
               ) : (
                 filtered.map((c) => {
                   const isPending = pendingIds.has(c.id)
+                  const isJoined = joinedIds.has(c.id)
                   return (
                     <div
                       key={c.id}
@@ -334,13 +339,17 @@ export function OnboardingClient({
                         </p>
                       </div>
                       <Button
-                        onClick={() => requestJoin(c.id)}
+                        onClick={() =>
+                          isJoined ? router.push(`/app/chat/${c.id}`) : requestJoin(c.id)
+                        }
                         disabled={isPending || requesting === c.id}
-                        variant={isPending ? 'outline' : 'default'}
+                        variant={isPending || isJoined ? 'outline' : 'default'}
                         className="shrink-0 rounded-xl"
                       >
                         {requesting === c.id ? (
                           <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : isJoined ? (
+                          '참여 중'
                         ) : isPending ? (
                           <>
                             <Check className="mr-1 h-4 w-4" /> 신청됨

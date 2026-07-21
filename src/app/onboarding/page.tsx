@@ -9,7 +9,9 @@ export const dynamic = 'force-dynamic'
 export default async function OnboardingPage() {
   const user = await getCurrentUser()
   if (!user) redirect('/login?callbackUrl=/onboarding')
-  if (user.communities.length > 0) redirect('/app/chat')
+  // 이미 마을이 있어도 되돌리지 않는다.
+  // 되돌리면 "새 마을 참여하기"를 눌러도 원래 화면으로 튕겨 나와
+  // 두 번째 마을에 절대 가입할 수 없다.
 
   // isPublic + createdAt 복합 인덱스를 요구하지 않도록 정렬은 메모리에서 처리한다.
   const commSnap = await adminDb
@@ -71,6 +73,7 @@ export default async function OnboardingPage() {
       communities={publicCommunities}
       pendingRequests={pendingRequests}
       isSuperadmin={user.realRole === 'superadmin'}
+      joinedCommunityIds={user.communities.map((c) => c.id)}
     />
   )
 }

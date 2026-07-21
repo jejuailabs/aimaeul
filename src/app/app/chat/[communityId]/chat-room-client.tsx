@@ -31,6 +31,8 @@ import { MessageBubble, type PhotoData } from '@/components/message-bubble'
 import { communityTypeMeta, formatKoreanTime } from '@/lib/village'
 import { cn } from '@/lib/utils'
 import { GamesClient } from '@/app/app/games/games-client'
+import { collection, limit, onSnapshot, orderBy, query } from 'firebase/firestore'
+import { firestore } from '@/lib/firebase'
 import { toast } from 'sonner'
 
 const EMOJI_SET = [
@@ -63,6 +65,8 @@ type Props = {
   photoMap: Record<string, PhotoData>
   /** 게임 참가자 후보 (마을 회원). 게임 모달에서 사용한다. */
   gameMembers: { id: string; name: string; photoURL?: string | null }[]
+  /** 회장·관리자만 게임을 진행할 수 있다. 회원에게는 버튼을 숨긴다. */
+  canRunGame: boolean
 }
 
 export function ChatRoomClient({
@@ -71,6 +75,7 @@ export function ChatRoomClient({
   initialMessages,
   photoMap,
   gameMembers,
+  canRunGame,
 }: Props) {
   const router = useRouter()
   const { messages, send, online, typingFrom } = useChatSocket(
@@ -83,22 +88,51 @@ export function ChatRoomClient({
   // 사진은 확인 창을 거친 뒤에만 올라간다.
   const [pendingFiles, setPendingFiles] = useState<File[]>([])
   const [pendingPreviews, setPendingPreviews] = useState<string[]>([])
-  // 게임은 화면 이동 없이 모달로 연다. 진행 권한은 회장·관리자에게만 있다.
+  // 게임은 화면 이동 없이 모달로 연다. 권한은 서버에서 받는다.
   const [gameOpen, setGameOpen] = useState(false)
-  const [canRunGame, setCanRunGame] = useState(false)
+
+  /**
+   * 사진은 실시간으로 구독한다.
+   *
+   * 서버가 준 photoMap은 화면을 열던 시점의 고정값이라, 이후에 올라온 사진은
+   * 여기에 없어 말풍선이 빈 자리로 표시됐다(내가 올린 사진도 안 보였다).
+   */
+  const [photos, setPhotos] = useState<Record<string, PhotoData>>(photoMap)
 
   useEffect(() => {
-    if (!gameOpen || canRunGame) return
-    fetch('/api/view-mode')
-      .then((r) => (r.ok ? r.json() : null))
-      .then((d) => {
-        if (!d) return
-        setCanRunGame(
-          d.role === 'superadmin' || (d.adminCommunities || []).includes(community.id)
-        )
-      })
-      .catch(() => {})
-  }, [gameOpen, canRunGame, community.id])
+    const q = query(
+      collection(firestore, 'communities', community.id, 'photos'),
+      orderBy('createdAt', 'desc'),
+      limit(100)
+    )
+    const unsub = onSnapshot(
+      q,
+      (snap) => {
+        setPhotos((prev) => {
+          const next = { ...prev }
+          for (const d of snap.docs) {
+            const p = d.data() as any
+            next[d.id] = {
+              id: d.id,
+              storageUrl: p.storageUrl,
+              thumbnailUrl: p.thumbnailUrl ?? p.storageUrl,
+              uploaderName: p.uploaderName,
+              exifTakenAt: p.exifTakenAt ?? null,
+              exifLat: p.exifLat ?? null,
+              exifLng: p.exifLng ?? null,
+              exifDevice: p.exifDevice ?? null,
+              exifLens: p.exifLens ?? null,
+              exifAddress: p.exifAddress ?? null,
+              aiCaption: p.aiCaption ?? null,
+            }
+          }
+          return next
+        })
+      },
+      (e) => console.error('[chat] 사진 구독 실패:', e)
+    )
+    return () => unsub()
+  }, [community.id])
   const [emojiPacks, setEmojiPacks] = useState<EmojiPack[]>([])
   const [emojiPacksLoaded, setEmojiPacksLoaded] = useState(false)
   const [activePackTab, setActivePackTab] = useState<string>('unicode')
@@ -249,7 +283,7 @@ export function ChatRoomClient({
               key={m.id}
               message={m}
               mine={m.authorUid === user.id}
-              photo={m.photoId ? photoMap[m.photoId] || null : null}
+              photo={m.photoId ? photos[m.photoId] || null : null}
             />
           ))}
           {typingFrom && typingFrom !== user.name && (
@@ -357,7 +391,8 @@ export function ChatRoomClient({
             </PopoverContent>
           </Popover>
 
-          {/* 게임은 화면 이동 없이 모달로 연다 */}
+          {/* 회원에게는 게임 아이콘을 아예 보이지 않게 한다 */}
+          {canRunGame && (
           <Button
             type="button"
             variant="ghost"
@@ -368,6 +403,7 @@ export function ChatRoomClient({
           >
             <Gamepad2 className="h-5 w-5" />
           </Button>
+          )}
 
           <Input
             value={text}

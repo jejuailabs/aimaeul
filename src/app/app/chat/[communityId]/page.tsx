@@ -101,8 +101,14 @@ export default async function ChatRoomPage({
     }
   })
 
+  // 게임은 회장·관리자만 진행한다. 회원에게는 아이콘 자체를 보이지 않게
+  // 서버에서 권한을 계산해 넘긴다(클라이언트에서 조회하면 잠깐 보였다 사라진다).
+  const canRunGame =
+    user.role === 'superadmin' || user.adminCommunities.includes(communityId)
+
   return (
     <ChatRoomClient
+      canRunGame={canRunGame}
       gameMembers={gameMembers}
       community={{
         id: communityId,
