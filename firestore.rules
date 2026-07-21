@@ -28,6 +28,13 @@ service cloud.firestore {
       match /readPositions/{communityId} {
         allow read, write: if isOwner(uid);
       }
+
+      // 개인 일기장 — 본인 외에는 어떤 경우에도 읽을 수 없다.
+      // 쓰기는 서버(admin SDK)를 거쳐 사진 경로 검증까지 하도록 막아둔다.
+      match /diaries/{diaryId} {
+        allow read: if isOwner(uid);
+        allow write: if false;
+      }
     }
 
     // communities 컬렉션

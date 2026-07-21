@@ -2,7 +2,7 @@
 
 import Link, { useLinkStatus } from 'next/link'
 import { usePathname } from 'next/navigation'
-import { MessageCircle, Home, Image, User, Loader2 } from 'lucide-react'
+import { MessageCircle, Home, Image, NotebookPen, User, Loader2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 // 게임은 회장·관리자가 채팅방에서 시작하고 회원은 참여만 하므로
@@ -11,6 +11,7 @@ const TABS = [
   { href: '/app/chat', label: '채팅', icon: MessageCircle },
   { href: '/app/home', label: '마을홈', icon: Home },
   { href: '/app/photos', label: '사진', icon: Image },
+  { href: '/app/diary', label: '일기장', icon: NotebookPen },
   { href: '/app/me', label: '내정보', icon: User },
 ] as const
 
