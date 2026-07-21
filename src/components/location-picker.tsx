@@ -75,7 +75,7 @@ export function LocationPicker({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  // 선택된 좌표를 마커로 반영
+  // 선택된 좌표를 마커로 반영하고, 지도도 그 자리로 옮긴다.
   useEffect(() => {
     const L = leafletRef.current
     const map = mapRef.current
@@ -85,6 +85,11 @@ export function LocationPicker({
       markerRef.current?.remove()
       markerRef.current = null
       return
+    }
+
+    // 주소로 찾은 좌표가 화면 밖이면 사용자는 마커를 볼 수 없다.
+    if (!map.getBounds().contains([value.lat, value.lng])) {
+      map.setView([value.lat, value.lng], Math.max(map.getZoom(), 14))
     }
 
     const icon = L.divIcon({

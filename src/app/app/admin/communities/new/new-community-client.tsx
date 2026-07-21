@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Check, Copy, Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -25,6 +25,40 @@ export function NewCommunityClient() {
   const [copied, setCopied] = useState(false)
 
   const sigunguOptions = useMemo(() => (sido ? SIGUNGU_BY_SIDO[sido] ?? [] : []), [sido])
+
+  const [geocoding, setGeocoding] = useState(false)
+  const [geocodedLabel, setGeocodedLabel] = useState<string | null>(null)
+
+  /**
+   * 입력한 주소로 지도 위치를 자동으로 잡아준다.
+   * 지도를 손으로 찾아 찍게 하면 어렵고, 엉뚱한 곳을 찍기 쉽다.
+   * 사용자가 지도를 직접 눌러 고친 뒤에는 덮어쓰지 않는다.
+   */
+  useEffect(() => {
+    if (!sido || !sigungu) return
+    const query = [sido, sigungu, eupmyeondong].filter(Boolean).join(' ')
+
+    let cancelled = false
+    // 타이핑 중에 매번 조회하지 않도록 잠깐 기다린다.
+    const timer = setTimeout(async () => {
+      setGeocoding(true)
+      try {
+        const res = await fetch(`/api/geocode?q=${encodeURIComponent(query)}`)
+        const d = await res.json().catch(() => ({}))
+        const hit = d.results?.[0]
+        if (cancelled || !hit) return
+        setCoords({ lat: hit.lat, lng: hit.lng })
+        setGeocodedLabel(hit.label)
+      } finally {
+        if (!cancelled) setGeocoding(false)
+      }
+    }, 600)
+
+    return () => {
+      cancelled = true
+      clearTimeout(timer)
+    }
+  }, [sido, sigungu, eupmyeondong])
 
   const canSubmit =
     name.trim() && communityType && sido && sigungu && coords && !saving
@@ -212,8 +246,22 @@ export function NewCommunityClient() {
       </div>
 
       <div>
-        <label className="mb-2 block text-sm font-semibold">지도에서 위치 지정</label>
-        <LocationPicker value={coords} onChange={setCoords} />
+        <label className="mb-2 block text-sm font-semibold">마을 위치</label>
+        <p className="mb-2 text-xs text-muted-foreground">
+          {geocoding
+            ? '주소로 위치를 찾는 중…'
+            : geocodedLabel
+              ? `주소로 자동 지정했어요 — ${geocodedLabel.split(',').slice(0, 3).join(', ')}`
+              : '읍·면·동까지 입력하면 지도가 자동으로 이동해요. 필요하면 지도를 눌러 조정하세요.'}
+        </p>
+        <LocationPicker
+          value={coords}
+          onChange={(v) => {
+            // 직접 찍으면 자동 지정 안내는 지운다.
+            setGeocodedLabel(null)
+            setCoords(v)
+          }}
+        />
       </div>
 
       <Button onClick={submit} disabled={!canSubmit} size="lg" className="w-full rounded-xl">

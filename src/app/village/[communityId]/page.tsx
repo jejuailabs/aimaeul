@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { notFound } from 'next/navigation'
+import { notFound, redirect } from 'next/navigation'
 import { Calendar, Home as HomeIcon, MapPin, Users, Sparkles, Camera, Gamepad2, ArrowRight, Building2, Clock } from 'lucide-react'
 import { adminDb } from '@/lib/firebase-admin'
 import { getCurrentUser } from '@/lib/session'
@@ -57,6 +57,12 @@ export default async function VillageHomePage({
   if (!commDoc.exists) notFound()
   const community = commDoc.data()!
   const isMember = user ? user.communities.some((c) => c.id === communityId) : false
+
+  // 이 페이지는 비회원·검색엔진용 공개 홈페이지다.
+  // 회원에게는 같은 내용이 마을홈에 있어, 그대로 두면 똑같은 화면이 두 개로 보인다.
+  if (isMember) {
+    redirect(`/app/home?c=${communityId}`)
+  }
 
   if (!community.isPublic && !isMember) {
     return (

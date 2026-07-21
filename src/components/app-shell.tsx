@@ -5,7 +5,6 @@ import { ArrowLeft, Map } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { BottomTabBar } from '@/components/bottom-tab-bar'
 import { ViewModeBadge } from '@/components/view-mode-badge'
-import { BackToChatFab } from '@/components/back-to-chat-fab'
 import { cn } from '@/lib/utils'
 
 /**
@@ -62,8 +61,7 @@ export function AppShell({
       <main className={cn('mx-auto w-full max-w-2xl flex-1', hideTabBar ? 'pb-4' : 'pb-24', className)}>
         {children}
       </main>
-      {/* 채팅 화면이 아니면 어디서든 돌아갈 수 있게 한다 */}
-      <BackToChatFab />
+      {/* 채팅은 하단 탭 정중앙에 크게 있으므로 별도 버튼을 두지 않는다 */}
       {!hideTabBar && <BottomTabBar />}
     </div>
   )
