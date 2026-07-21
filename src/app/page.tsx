@@ -30,7 +30,7 @@ export default async function Home() {
     (a, b) => (a.data().createdAt?.toMillis?.() ?? 0) - (b.data().createdAt?.toMillis?.() ?? 0)
   )
 
-  const feedItems = await fetchGlobalFeed(30)
+  const feed = await fetchGlobalFeed(20)
 
   const publicCommunities = await Promise.all(
     commDocs.map(async (doc) => {
@@ -103,7 +103,7 @@ export default async function Home() {
             <span className="text-xs text-muted-foreground">전국 마을 최신 소식</span>
           </div>
           <div className="mx-auto max-w-xl">
-            <GlobalFeed items={feedItems} />
+            <GlobalFeed feed={feed} />
           </div>
         </section>
 

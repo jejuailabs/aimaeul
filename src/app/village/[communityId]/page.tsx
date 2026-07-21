@@ -5,6 +5,7 @@ import { adminDb } from '@/lib/firebase-admin'
 import { getCurrentUser } from '@/lib/session'
 import { ThemeToggle } from '@/components/theme-toggle'
 import { AuthHeaderActions } from '@/components/auth-header-actions'
+import { attachCommentsToPhotos } from '@/lib/photo-comments'
 import { CommunityBadge } from '@/components/community-badge'
 import { PhotoWithExif } from '@/components/exif-overlay'
 import { LiveChatPanel } from '@/components/live-chat-panel'
@@ -107,6 +108,24 @@ export default async function VillageHomePage({
     .get()
 
   const photos = photosSnap.docs.map((d) => ({ id: d.id, ...d.data() })) as any[]
+
+  // 사진 직후에 이어진 대화를 그 사진의 코멘트로 묶는다.
+  // 사진과 대화가 따로 놓이면 어떤 사진에 대한 말인지 알 수 없다.
+  const { commentsByPhoto } = attachCommentsToPhotos(
+    photos.map((p: any) => ({ id: p.id, createdAtMs: p.createdAt?.toMillis?.() ?? 0 })),
+    messagesSnap.docs.map((d) => {
+      const m = d.data()
+      return {
+        id: d.id,
+        createdAtMs: m.createdAt?.toMillis?.() ?? 0,
+        authorName: m.authorName ?? '익명',
+        authorPhotoURL: m.authorPhotoURL ?? null,
+        text: m.text ?? '',
+        createdAt: m.createdAt?.toDate?.()?.toISOString() ?? null,
+        type: m.type,
+      }
+    })
+  )
 
   const photoMap = new Map<string, PhotoData>()
   const initialMessages = messagesSnap.docs.map((d) => {
@@ -287,6 +306,21 @@ export default async function VillageHomePage({
                     />
                     {p.aiCaption && (
                       <p className="mt-1 px-1 text-xs text-muted-foreground">{p.aiCaption}</p>
+                    )}
+                    {/* 이 사진에 바로 이어진 대화 */}
+                    {(commentsByPhoto.get(p.id) ?? []).length > 0 && (
+                      <div className="mt-1.5 space-y-1 px-1">
+                        {(commentsByPhoto.get(p.id) ?? []).map((c) => (
+                          <div key={c.id} className="flex items-start gap-1.5">
+                            <span className="mt-1 shrink-0 text-[11px] font-semibold text-muted-foreground">
+                              {c.authorName}
+                            </span>
+                            <span className="inline-block rounded-2xl rounded-tl-md bg-muted/70 px-2.5 py-1 text-sm">
+                              {c.text}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
                     )}
                   </div>
                 ))}
