@@ -33,7 +33,14 @@ const OSM_URL = 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png'
 const OSM_ATTRIBUTION =
   '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> 기여자'
 
-export function KoreaVillageMap({ communities }: { communities: PublicCommunity[] }) {
+export function KoreaVillageMap({
+  communities,
+  children,
+}: {
+  communities: PublicCommunity[]
+  /** 지도와 마을 목록 사이에 끼워 넣을 영역(마을 소식 피드). */
+  children?: React.ReactNode
+}) {
   const [query, setQuery] = useState('')
   const [active, setActive] = useState<string | null>(null)
   // 지도는 비동기로 생성되므로, 마커 effect가 생성 완료를 기다리도록 상태로 알린다.
@@ -158,14 +165,13 @@ export function KoreaVillageMap({ communities }: { communities: PublicCommunity[
     }
   }, [active])
 
-  return (
-    <div className="grid gap-6 lg:grid-cols-[1.1fr_1fr]">
-      {/* Map panel */}
-      <div className="overflow-hidden rounded-3xl border border-border bg-card">
+  const mapPanel = (
+    <div className="overflow-hidden rounded-3xl border border-border bg-card">
         <div
           ref={containerRef}
           className={cn(
-            'h-[420px] w-full lg:h-[70vh]',
+            // 모바일에서는 화면의 1/3 정도만 차지하게 해 아래 소식이 함께 보이도록 한다.
+            'h-[33vh] w-full lg:h-[70vh]',
             // 다크모드에서 타일이 눈부시지 않도록 살짝 눌러준다.
             resolvedTheme === 'dark' && 'leaflet-dark'
           )}
@@ -184,9 +190,10 @@ export function KoreaVillageMap({ communities }: { communities: PublicCommunity[
           ))}
         </div>
       </div>
+  )
 
-      {/* List panel */}
-      <div className="flex flex-col gap-3">
+  const listPanel = (
+      <div id="village-list" className="flex flex-col gap-3 scroll-mt-20">
         <div className="relative">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
@@ -197,7 +204,7 @@ export function KoreaVillageMap({ communities }: { communities: PublicCommunity[
           />
         </div>
 
-        <div className="max-h-[60vh] space-y-3 overflow-y-auto pr-1 lg:max-h-[70vh]">
+        <div className="space-y-3 lg:max-h-[70vh] lg:overflow-y-auto lg:pr-1">
           {filtered.length === 0 && (
             <div className="rounded-2xl border border-dashed border-border p-8 text-center text-sm text-muted-foreground">
               검색된 마을이 없어요.
@@ -256,6 +263,17 @@ export function KoreaVillageMap({ communities }: { communities: PublicCommunity[
             )
           })}
         </div>
+      </div>
+  )
+
+  // 모바일: 지도(1/3) → 마을 소식 → 마을 목록 순으로 쌓는다.
+  // 데스크톱: 지도를 왼쪽에 고정하고 오른쪽에 소식과 목록을 둔다.
+  return (
+    <div className="grid gap-6 lg:grid-cols-[1.1fr_1fr] lg:items-start">
+      {mapPanel}
+      <div className="flex flex-col gap-6">
+        {children}
+        {listPanel}
       </div>
     </div>
   )

@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { MapPin, Sparkles, MessageCircle, Camera, Search } from 'lucide-react'
 import { AuthHeaderActions } from '@/components/auth-header-actions'
+import { PublicBottomNav } from '@/components/public-bottom-nav'
 import { GlobalFeed } from '@/components/global-feed'
 import { getHomeData } from '@/lib/home-data'
 import { Button } from '@/components/ui/button'
@@ -27,13 +28,17 @@ export default async function Home() {
       {/* Header */}
       <header className="sticky top-0 z-30 border-b border-border/60 bg-background/80 backdrop-blur">
         <div className="mx-auto flex max-w-6xl items-center justify-between gap-3 px-4 py-3">
-          <Link href="/" className="flex items-center gap-2">
-            <span className="flex h-9 w-9 items-center justify-center rounded-2xl bg-primary text-lg font-black text-primary-foreground">
+          {/* 좁은 화면에서 로고가 줄바꿈되지 않도록 고정 폭을 주지 않고 shrink를 막는다 */}
+          <Link href="/" className="flex shrink-0 items-center gap-2">
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl bg-primary text-lg font-black text-primary-foreground">
               마
             </span>
             <div className="leading-tight">
-              <p className="text-sm font-bold">우리마을</p>
-              <p className="text-[10px] text-muted-foreground">마을 공동체 플랫폼</p>
+              <p className="whitespace-nowrap text-sm font-bold">우리마을</p>
+              {/* 부제는 공간이 넉넉할 때만 노출 */}
+              <p className="hidden whitespace-nowrap text-[10px] text-muted-foreground sm:block">
+                마을 공동체 플랫폼
+              </p>
             </div>
           </Link>
           <div className="flex items-center gap-2">
@@ -45,33 +50,29 @@ export default async function Home() {
       </header>
 
       <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-6">
-        {/* Hero */}
-        <section className="mb-6 text-center">
-          <div className="mb-3 inline-flex items-center gap-1.5 rounded-full bg-primary/15 px-3 py-1 text-xs font-medium text-primary-foreground/80">
-            <Sparkles className="h-3.5 w-3.5" /> 카카오톡처럼 쓰는 마을 공동체 플랫폼
-          </div>
-          <h1 className="text-2xl font-black leading-tight sm:text-3xl">
+        {/* Hero — 제목은 한 줄로, 설명은 그 아래 흐리게 */}
+        <section className="mb-4 text-center">
+          <h1 className="whitespace-nowrap text-xl font-black leading-tight sm:text-3xl">
             대한민국 마을, 지도로 만나보세요
           </h1>
-          <p className="mx-auto mt-2 max-w-xl text-sm text-muted-foreground">
-            부녀회·청년회·노인회·동호회가 올리는 사진과 대화가 실시간으로 모여,
-            <br className="hidden sm:block" /> AI가 자동으로 마을 아카이브를 만듭니다.
+          <p className="mt-1.5 inline-flex items-center gap-1.5 text-xs text-muted-foreground">
+            <Sparkles className="h-3.5 w-3.5" /> 카카오톡처럼 쓰는 마을 공동체 플랫폼
           </p>
         </section>
 
-        {/* Map + list */}
-        <KoreaVillageMap communities={publicCommunities} />
-
-        {/* 전국 마을 통합 피드 */}
-        <section className="mt-10">
-          <div className="mb-3 flex items-center justify-between">
-            <h2 className="text-lg font-black">지금 마을에서는</h2>
-            <span className="text-xs text-muted-foreground">전국 마을 최신 소식</span>
-          </div>
-          <div className="mx-auto max-w-xl">
-            <GlobalFeed feed={feed} />
-          </div>
-        </section>
+        {/* 지도(모바일 1/3) → 마을 소식(1/3, 내부 스크롤) → 마을 목록 */}
+        <KoreaVillageMap communities={publicCommunities}>
+          <section>
+            <div className="mb-2 flex items-center justify-between">
+              <h2 className="text-base font-black">지금 마을에서는</h2>
+              <span className="text-[11px] text-muted-foreground">전국 마을 최신 소식</span>
+            </div>
+            {/* 소식은 이 영역 안에서만 스크롤된다 */}
+            <div className="max-h-[33vh] overflow-y-auto rounded-2xl border border-border bg-muted/20 p-2 lg:max-h-[60vh]">
+              <GlobalFeed feed={feed} />
+            </div>
+          </section>
+        </KoreaVillageMap>
 
         {/* Feature highlights */}
         <section className="mt-10 grid gap-3 sm:grid-cols-3">
@@ -105,6 +106,8 @@ export default async function Home() {
           ))}
         </section>
       </main>
+
+      <PublicBottomNav />
 
       <footer className="mt-auto border-t border-border/60 bg-muted/30">
         <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-2 px-4 py-5 text-xs text-muted-foreground sm:flex-row">
