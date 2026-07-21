@@ -1,3 +1,4 @@
+import { cache } from 'react'
 import { cookies } from 'next/headers'
 import { adminAuth, adminDb } from '@/lib/firebase-admin'
 import { isViewMode, VIEW_MODE_COOKIE, type ViewMode } from '@/lib/view-mode'
@@ -79,26 +80,38 @@ function applyViewMode(
   }
 }
 
-export async function getCurrentUser(): Promise<CurrentUser | null> {
+/**
+ * 현재 로그인 사용자.
+ *
+ * 한 화면을 그릴 때 페이지·헤더·셸이 각각 이 함수를 부르므로 cache로 감싼다.
+ * 감싸지 않으면 같은 조회를 요청 한 번에 서너 번 반복한다.
+ */
+export const getCurrentUser = cache(async function getCurrentUser(): Promise<CurrentUser | null> {
   const cookieStore = await cookies()
   const sessionCookie = cookieStore.get('__session')?.value
   if (!sessionCookie) return null
 
   try {
-    const decoded = await adminAuth.verifySessionCookie(sessionCookie, true)
+    // checkRevoked를 켜면 매 요청마다 구글 인증 서버를 왕복해 0.8초가 더 붙는다.
+    // 세션 쿠키 자체에 만료(5일)가 있고, 로그아웃 시 쿠키를 지우므로 끈다.
+    const decoded = await adminAuth.verifySessionCookie(sessionCookie, false)
     const userDoc = await adminDb.collection('users').doc(decoded.uid).get()
     if (!userDoc.exists) return null
 
     const userData = userDoc.data()!
     const communityIds: string[] = userData.communityIds || []
 
+    // 마을을 하나씩 순차로 읽으면 소속 수만큼 왕복이 늘어난다. 한 번에 가져온다.
     const communities: CurrentUser['communities'] = []
-    for (const cid of communityIds) {
-      const cDoc = await adminDb.collection('communities').doc(cid).get()
-      if (cDoc.exists) {
+    if (communityIds.length > 0) {
+      const docs = await adminDb.getAll(
+        ...communityIds.map((id) => adminDb.collection('communities').doc(id))
+      )
+      for (const cDoc of docs) {
+        if (!cDoc.exists) continue
         const d = cDoc.data()!
         communities.push({
-          id: cid,
+          id: cDoc.id,
           name: d.name,
           communityType: d.communityType,
           regionName: d.regionName,
@@ -121,4 +134,4 @@ export async function getCurrentUser(): Promise<CurrentUser | null> {
   } catch {
     return null
   }
-}
+})

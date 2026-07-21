@@ -55,27 +55,16 @@ function formatKoreanDate(date: string) {
   return `${y}년 ${m}월 ${d}일 ${days[dt.getDay()]}요일`
 }
 
-export function DiaryClient() {
-  const [entries, setEntries] = useState<DiaryEntry[]>([])
-  const [loading, setLoading] = useState(true)
+export function DiaryClient({
+  initialEntries,
+}: {
+  /** 서버에서 미리 담아온 일기. 첫 화면을 로딩 없이 그린다. */
+  initialEntries: DiaryEntry[]
+}) {
+  const [entries, setEntries] = useState<DiaryEntry[]>(initialEntries)
+  const [loading, setLoading] = useState(false)
   const [view, setView] = useState<'list' | 'calendar'>('list')
   const [writeOpen, setWriteOpen] = useState(false)
-
-  const load = useCallback(async () => {
-    try {
-      const res = await fetch('/api/diary')
-      const d = await res.json().catch(() => ({}))
-      setEntries(d.entries || [])
-    } catch {
-      setEntries([])
-    } finally {
-      setLoading(false)
-    }
-  }, [])
-
-  useEffect(() => {
-    load()
-  }, [load])
 
   async function remove(id: string) {
     const res = await fetch(`/api/diary/${id}`, { method: 'DELETE' })
