@@ -101,26 +101,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           email: firebaseUser.email,
           photoURL: firebaseUser.photoURL,
         }
-        // 역할은 users 문서에만 있으므로, 우선 기본값으로 노출한 뒤 조회 결과로 갱신한다.
-        setUser({ ...baseUser, role: 'user', adminCommunities: [] })
-
-        // 서버 세션 쿠키를 여기서 만든다.
+        // 서버 세션 쿠키를 setUser보다 "먼저" 만든다.
         //
-        // 모바일은 signInWithRedirect라 로그인 버튼 핸들러가 중간에 끊긴다
-        // (브라우저가 구글로 이동). 그래서 핸들러에서 쿠키를 만들면 모바일은
-        // 영영 쿠키가 생기지 않고, 미들웨어가 /login으로 되돌려 무한 반복된다.
-        // 인증 상태가 복구되는 이 지점에서 만들어야 팝업/리다이렉트 모두 안전하다.
+        // 로그인 화면은 user가 생기는 즉시 /app/chat으로 이동시키는데,
+        // 그때 __session 쿠키가 없으면 미들웨어가 /login으로 되돌려
+        // 로그인 → 튕김 → 로그인이 반복된다.
+        // 쿠키를 먼저 세운 뒤에 사용자 상태를 노출해야 이 경쟁이 사라진다.
         try {
           const idToken = await firebaseUser.getIdToken()
-          await fetch('/api/auth/session', {
+          const res = await fetch('/api/auth/session', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ idToken }),
           })
-        } catch {
-          // 쿠키 생성 실패 시에도 클라이언트 상태는 유지하고, 보호된 경로 접근 시
-          // 미들웨어가 다시 로그인으로 안내한다.
+          if (!res.ok) {
+            console.error('[auth] 세션 쿠키 생성 실패:', res.status)
+          }
+        } catch (e) {
+          console.error('[auth] 세션 쿠키 요청 오류:', e)
         }
+
+        // 역할은 users 문서에만 있으므로, 우선 기본값으로 노출한 뒤 조회 결과로 갱신한다.
+        setUser({ ...baseUser, role: 'user', adminCommunities: [] })
 
         const userRef = doc(firestore, 'users', firebaseUser.uid)
         const userSnap = await getDoc(userRef)
@@ -160,29 +162,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => unsubscribe()
   }, [])
 
+  /**
+   * 모바일에서도 팝업을 먼저 쓴다.
+   *
+   * 리다이렉트 방식은 브라우저의 서드파티 저장소 정책에 취약해
+   * 모바일에서 "로그인했는데 다시 로그인 화면"이 반복되는 원인이 됐다.
+   * 팝업은 사용자 제스처에서 열리면 모바일 브라우저에서도 잘 동작하고,
+   * 인증 결과를 postMessage로 받으므로 저장소 차단의 영향을 받지 않는다.
+   * 팝업이 정말 불가능한 환경에서만 리다이렉트로 내려간다.
+   */
   async function signInWithGoogle() {
-    const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent)
-    if (isMobile) {
-      // 리다이렉트는 여기서 반환되지 않는다. 브라우저가 구글로 이동하고,
-      // 돌아온 뒤 onAuthStateChanged가 세션 쿠키까지 만든다.
-      await signInWithRedirect(auth, googleProvider)
-      return
-    }
-
     try {
       await signInWithPopup(auth, googleProvider)
     } catch (e: any) {
-      // 데스크톱이라도 팝업이 차단되면 리다이렉트로 넘어간다.
       const code = e?.code ?? ''
-      if (
-        code === 'auth/popup-blocked' ||
-        code === 'auth/operation-not-supported-in-this-environment' ||
-        code === 'auth/cancelled-popup-request'
-      ) {
-        await signInWithRedirect(auth, googleProvider)
-        return
+      // 사용자가 직접 닫은 경우는 실패로 취급하지 않는다.
+      if (code === 'auth/popup-closed-by-user' || code === 'auth/user-cancelled') {
+        throw e
       }
-      throw e
+      console.warn('[auth] 팝업 로그인 실패, 리다이렉트로 전환:', code)
+      await signInWithRedirect(auth, googleProvider)
     }
   }
 
