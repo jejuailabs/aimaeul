@@ -19,14 +19,30 @@ type TimelineItem = {
   eventLocation?: string
 }
 
+/**
+ * 오늘 날짜(한국 시간 기준).
+ *
+ * toISOString()은 UTC라 한국 시간과 하루가 어긋난다.
+ * 로컬 값으로 직접 만들어야 날짜 이동이 어긋나지 않는다.
+ */
+function todayLocal(): string {
+  const d = new Date()
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${y}-${m}-${day}`
+}
+
 export default function TimelinePage() {
   const params = useParams()
   const communityId = params.communityId as string
 
-  const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10))
+  const [date, setDate] = useState(todayLocal)
   const [items, setItems] = useState<TimelineItem[]>([])
   const [communityName, setCommunityName] = useState('')
   const [loading, setLoading] = useState(true)
+  /** 활동 기록이 있는 날짜(최신순). 빈 날짜는 건너뛰기 위해 쓴다. */
+  const [activeDates, setActiveDates] = useState<string[]>([])
 
   const fetchTimeline = useCallback(async (targetDate: string) => {
     setLoading(true)
@@ -50,11 +66,46 @@ export default function TimelinePage() {
     fetchTimeline(date)
   }, [date, fetchTimeline])
 
-  const changeDate = (delta: number) => {
-    const d = new Date(date + 'T00:00:00')
-    d.setDate(d.getDate() + delta)
-    setDate(d.toISOString().slice(0, 10))
+  // 기록이 있는 날짜를 받아, 가장 최근 기록일로 시작한다.
+  useEffect(() => {
+    let cancelled = false
+    fetch(`/api/v1/village/${communityId}/active-dates`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        if (cancelled || !d?.dates) return
+        setActiveDates(d.dates)
+        if (d.dates.length > 0 && !d.dates.includes(todayLocal())) {
+          setDate(d.dates[0])
+        }
+      })
+      .catch(() => {})
+    return () => {
+      cancelled = true
+    }
+  }, [communityId])
+
+  /**
+   * 기록이 있는 날짜로만 이동한다.
+   * activeDates는 최신순이므로, 과거로 가려면 인덱스를 늘린다.
+   */
+  const goToAdjacent = (direction: 'prev' | 'past' | 'next') => {
+    if (activeDates.length === 0) return
+    const idx = activeDates.indexOf(date)
+    if (idx === -1) {
+      // 목록에 없는 날짜(직접 고른 날)면 가장 가까운 기록일로 이동
+      const target =
+        direction === 'past'
+          ? activeDates.find((d) => d < date)
+          : [...activeDates].reverse().find((d) => d > date)
+      if (target) setDate(target)
+      return
+    }
+    const nextIdx = direction === 'past' ? idx + 1 : idx - 1
+    if (nextIdx >= 0 && nextIdx < activeDates.length) setDate(activeDates[nextIdx])
   }
+
+  const hasPast = activeDates.some((d) => d < date)
+  const hasFuture = activeDates.some((d) => d > date)
 
   const displayDate = new Date(date + 'T00:00:00').toLocaleDateString('ko-KR', {
     year: 'numeric',
@@ -83,7 +134,9 @@ export default function TimelinePage() {
             variant="ghost"
             size="icon"
             className="h-8 w-8 rounded-full"
-            onClick={() => changeDate(-1)}
+            aria-label="이전 기록일"
+            onClick={() => goToAdjacent('past')}
+            disabled={!hasPast}
           >
             <ChevronLeft className="h-4 w-4" />
           </Button>
@@ -92,7 +145,8 @@ export default function TimelinePage() {
             <input
               type="date"
               value={date}
-              onChange={(e) => setDate(e.target.value)}
+              max={todayLocal()}
+              onChange={(e) => e.target.value && setDate(e.target.value)}
               className="rounded-lg border border-border bg-card px-3 py-1.5 text-sm"
             />
           </div>
@@ -100,14 +154,20 @@ export default function TimelinePage() {
             variant="ghost"
             size="icon"
             className="h-8 w-8 rounded-full"
-            onClick={() => changeDate(1)}
-            disabled={date >= new Date().toISOString().slice(0, 10)}
+            aria-label="다음 기록일"
+            onClick={() => goToAdjacent('next')}
+            disabled={!hasFuture}
           >
             <ChevronRight className="h-4 w-4" />
           </Button>
         </div>
 
-        <p className="mb-4 text-center text-xs text-muted-foreground">{displayDate}</p>
+        <p className="mb-1 text-center text-xs text-muted-foreground">{displayDate}</p>
+        {activeDates.length > 0 && (
+          <p className="mb-4 text-center text-[11px] text-muted-foreground">
+            기록이 있는 날 {activeDates.length}일 · 화살표로 넘겨보세요
+          </p>
+        )}
 
         {/* Timeline */}
         {loading ? (
