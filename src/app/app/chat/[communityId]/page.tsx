@@ -87,8 +87,23 @@ export default async function ChatRoomPage({
     }
   }
 
+  // 게임 참가자 후보 = 이 마을 회원. 게임 모달에서 쓴다.
+  const memberSnap = await adminDb
+    .collection('users')
+    .where('communityIds', 'array-contains', communityId)
+    .get()
+  const gameMembers = memberSnap.docs.map((d) => {
+    const u = d.data()
+    return {
+      id: d.id,
+      name: u.displayName ?? '익명',
+      photoURL: u.photoURL ?? null,
+    }
+  })
+
   return (
     <ChatRoomClient
+      gameMembers={gameMembers}
       community={{
         id: communityId,
         name: community.name ?? '',

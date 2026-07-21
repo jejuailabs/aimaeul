@@ -87,7 +87,14 @@ type GamePanelProps = {
 // ============================================================================
 // 메인 GamesClient
 // ============================================================================
-export function GamesClient({ communities, defaultCommunityId }: Props) {
+export function GamesClient({
+  communities,
+  defaultCommunityId,
+  embedded = false,
+}: Props & {
+  /** 모달 안에서 쓸 때는 AppShell(헤더/하단탭) 없이 내용만 렌더링한다. */
+  embedded?: boolean
+}) {
   const [communityId, setCommunityId] = useState(defaultCommunityId)
   const [openGame, setOpenGame] = useState<GameId | null>(null)
   const [posting, setPosting] = useState(false)
@@ -133,8 +140,8 @@ export function GamesClient({ communities, defaultCommunityId }: Props) {
     [communityId]
   )
 
-  return (
-    <AppShell title="게임">
+  const body = (
+    <>
       {/* Community selector (only if multiple) */}
       {communities.length > 1 && (
         <div className="border-b border-border/60 bg-card/40 px-3 py-2">
@@ -207,8 +214,11 @@ export function GamesClient({ communities, defaultCommunityId }: Props) {
             })()}
         </DialogContent>
       </Dialog>
-    </AppShell>
+    </>
   )
+
+  if (embedded) return body
+  return <AppShell title="게임">{body}</AppShell>
 }
 
 // ============================================================================

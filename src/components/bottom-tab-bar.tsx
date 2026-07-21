@@ -2,14 +2,15 @@
 
 import Link, { useLinkStatus } from 'next/link'
 import { usePathname } from 'next/navigation'
-import { MessageCircle, Home, Image, Gamepad2, User, Loader2 } from 'lucide-react'
+import { MessageCircle, Home, Image, User, Loader2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
+// 게임은 회장·관리자가 채팅방에서 시작하고 회원은 참여만 하므로
+// 회원용 메뉴에서 제외한다.
 const TABS = [
   { href: '/app/chat', label: '채팅', icon: MessageCircle },
   { href: '/app/home', label: '마을홈', icon: Home },
   { href: '/app/photos', label: '사진', icon: Image },
-  { href: '/app/games', label: '게임', icon: Gamepad2 },
   { href: '/app/me', label: '내정보', icon: User },
 ] as const
 

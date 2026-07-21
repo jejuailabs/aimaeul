@@ -1,10 +1,11 @@
 'use client'
 
 import Link from 'next/link'
-import { ArrowLeft } from 'lucide-react'
+import { ArrowLeft, Map } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { BottomTabBar } from '@/components/bottom-tab-bar'
 import { ViewModeBadge } from '@/components/view-mode-badge'
+import { BackToChatFab } from '@/components/back-to-chat-fab'
 import { cn } from '@/lib/utils'
 
 /**
@@ -29,7 +30,8 @@ export function AppShell({
   const backHref = typeof back === 'string' ? back : back === true ? '/app/chat' : undefined
   return (
     <div className="flex min-h-screen flex-col bg-background">
-      {(title || backHref || right) && (
+      {/* 지도로 나가는 버튼이 항상 있어야 하므로 헤더는 조건 없이 렌더한다 */}
+      {(
         <header className="sticky top-0 z-30 flex h-14 items-center gap-2 border-b border-border/60 bg-background/95 px-2 backdrop-blur">
           {backHref && (
             <Button asChild variant="ghost" size="icon" className="rounded-full">
@@ -42,12 +44,26 @@ export function AppShell({
           {!title && <div className="flex-1" />}
           {/* 슈퍼관리자만 보이며, 탭 한 번으로 회장/회원 시점 전환 */}
           <ViewModeBadge />
+          {/* 앱 어디서든 지도(메인)로 나갈 수 있어야 한다 */}
+          <Button
+            asChild
+            variant="ghost"
+            size="icon"
+            className="shrink-0 rounded-full"
+            aria-label="마을 지도로"
+          >
+            <Link href="/">
+              <Map className="h-5 w-5" />
+            </Link>
+          </Button>
           {right}
         </header>
       )}
       <main className={cn('mx-auto w-full max-w-2xl flex-1', hideTabBar ? 'pb-4' : 'pb-24', className)}>
         {children}
       </main>
+      {/* 채팅 화면이 아니면 어디서든 돌아갈 수 있게 한다 */}
+      <BackToChatFab />
       {!hideTabBar && <BottomTabBar />}
     </div>
   )

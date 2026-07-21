@@ -18,11 +18,19 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { useChatSocket, type ChatMessage } from '@/hooks/use-chat-socket'
 import { MessageBubble, type PhotoData } from '@/components/message-bubble'
 import { communityTypeMeta, formatKoreanTime } from '@/lib/village'
 import { cn } from '@/lib/utils'
+import { GamesClient } from '@/app/app/games/games-client'
 import { toast } from 'sonner'
 
 const EMOJI_SET = [
@@ -53,6 +61,8 @@ type Props = {
   user: { id: string; name: string; photoURL?: string | null }
   initialMessages: ChatMessage[]
   photoMap: Record<string, PhotoData>
+  /** 게임 참가자 후보 (마을 회원). 게임 모달에서 사용한다. */
+  gameMembers: { id: string; name: string; photoURL?: string | null }[]
 }
 
 export function ChatRoomClient({
@@ -60,6 +70,7 @@ export function ChatRoomClient({
   user,
   initialMessages,
   photoMap,
+  gameMembers,
 }: Props) {
   const router = useRouter()
   const { messages, send, online, typingFrom } = useChatSocket(
@@ -69,6 +80,25 @@ export function ChatRoomClient({
   )
   const [text, setText] = useState('')
   const [uploading, setUploading] = useState(false)
+  // 사진은 확인 창을 거친 뒤에만 올라간다.
+  const [pendingFiles, setPendingFiles] = useState<File[]>([])
+  const [pendingPreviews, setPendingPreviews] = useState<string[]>([])
+  // 게임은 화면 이동 없이 모달로 연다. 진행 권한은 회장·관리자에게만 있다.
+  const [gameOpen, setGameOpen] = useState(false)
+  const [canRunGame, setCanRunGame] = useState(false)
+
+  useEffect(() => {
+    if (!gameOpen || canRunGame) return
+    fetch('/api/view-mode')
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        if (!d) return
+        setCanRunGame(
+          d.role === 'superadmin' || (d.adminCommunities || []).includes(community.id)
+        )
+      })
+      .catch(() => {})
+  }, [gameOpen, canRunGame, community.id])
   const [emojiPacks, setEmojiPacks] = useState<EmojiPack[]>([])
   const [emojiPacksLoaded, setEmojiPacksLoaded] = useState(false)
   const [activePackTab, setActivePackTab] = useState<string>('unicode')
@@ -95,13 +125,39 @@ export function ChatRoomClient({
     setText('')
   }
 
-  async function handlePhotoPick(e: React.ChangeEvent<HTMLInputElement>) {
+  /**
+   * 사진을 고르면 바로 올리지 않고 확인 창을 먼저 띄운다.
+   * 잘못 고른 사진이 마을 전체에 즉시 공개되는 사고를 막는다.
+   */
+  function handlePhotoPick(e: React.ChangeEvent<HTMLInputElement>) {
     const files = Array.from(e.target.files || [])
     e.target.value = ''
     if (files.length === 0) return
+
+    setPendingFiles(files)
+    setPendingPreviews(files.map((f) => URL.createObjectURL(f)))
+  }
+
+  function cancelPendingUpload() {
+    pendingPreviews.forEach(URL.revokeObjectURL)
+    setPendingPreviews([])
+    setPendingFiles([])
+  }
+
+  function removePendingAt(index: number) {
+    URL.revokeObjectURL(pendingPreviews[index])
+    const nextFiles = pendingFiles.filter((_, i) => i !== index)
+    const nextPreviews = pendingPreviews.filter((_, i) => i !== index)
+    setPendingFiles(nextFiles)
+    setPendingPreviews(nextPreviews)
+  }
+
+  async function confirmPhotoUpload() {
+    if (pendingFiles.length === 0) return
     setUploading(true)
     try {
-      for (const file of files) {
+      let failed = 0
+      for (const file of pendingFiles) {
         const fd = new FormData()
         fd.append('file', file)
         fd.append('communityId', community.id)
@@ -110,9 +166,11 @@ export function ChatRoomClient({
         if (!res.ok) {
           const d = await res.json().catch(() => ({}))
           toast.error(d.error || '사진 업로드 실패')
+          failed++
         }
       }
-      toast.success('사진을 올렸어요 📷')
+      if (failed === 0) toast.success('사진을 올렸어요 📷')
+      cancelPendingUpload()
     } finally {
       setUploading(false)
     }
@@ -299,10 +357,16 @@ export function ChatRoomClient({
             </PopoverContent>
           </Popover>
 
-          <Button asChild variant="ghost" size="icon" className="h-10 w-10 shrink-0 rounded-full" aria-label="게임">
-            <Link href={`/app/games?communityId=${community.id}`}>
-              <Gamepad2 className="h-5 w-5" />
-            </Link>
+          {/* 게임은 화면 이동 없이 모달로 연다 */}
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="h-10 w-10 shrink-0 rounded-full"
+            aria-label="게임"
+            onClick={() => setGameOpen(true)}
+          >
+            <Gamepad2 className="h-5 w-5" />
           </Button>
 
           <Input
@@ -328,6 +392,114 @@ export function ChatRoomClient({
           </Button>
         </div>
       </div>
+
+      {/* 게임 — 회장·관리자만 진행할 수 있고, 회원은 결과에 참여만 한다 */}
+      <Dialog open={gameOpen} onOpenChange={setGameOpen}>
+        <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>마을 게임</DialogTitle>
+          </DialogHeader>
+
+          {canRunGame ? (
+            <GamesClient
+              embedded
+              communities={[
+                {
+                  id: community.id,
+                  name: community.name,
+                  communityType: community.communityType,
+                  members: gameMembers,
+                },
+              ]}
+              defaultCommunityId={community.id}
+            />
+          ) : (
+            <div className="py-8 text-center">
+              <Gamepad2 className="mx-auto mb-3 h-10 w-10 text-muted-foreground/50" />
+              <p className="text-sm font-medium">게임은 회장님이 시작해요</p>
+              <p className="mt-1.5 text-sm text-muted-foreground">
+                회장님이 게임을 진행하면 채팅방에 결과가 올라와요.
+                <br />
+                기다렸다가 함께 참여하시면 돼요.
+              </p>
+              <Button
+                onClick={() => setGameOpen(false)}
+                size="lg"
+                className="mt-5 rounded-xl"
+              >
+                확인
+              </Button>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* 사진 업로드 확인 — 실수로 올리는 사고를 막는다 */}
+      <Dialog
+        open={pendingFiles.length > 0}
+        onOpenChange={(open) => {
+          if (!open && !uploading) cancelPendingUpload()
+        }}
+      >
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>이 사진을 올릴까요?</DialogTitle>
+          </DialogHeader>
+
+          <p className="text-sm text-muted-foreground">
+            {community.name} 채팅방과 마을 홈페이지에 함께 공개돼요.
+          </p>
+
+          <div className="flex flex-wrap gap-2">
+            {pendingPreviews.map((url, i) => (
+              <div key={url} className="group relative">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={url}
+                  alt={`올릴 사진 ${i + 1}`}
+                  className="h-28 w-28 rounded-xl bg-muted object-cover"
+                />
+                {!uploading && pendingPreviews.length > 1 && (
+                  <button
+                    type="button"
+                    onClick={() => removePendingAt(i)}
+                    aria-label="이 사진 빼기"
+                    className="absolute -right-1.5 -top-1.5 flex h-6 w-6 items-center justify-center rounded-full bg-destructive text-sm text-destructive-foreground shadow"
+                  >
+                    ×
+                  </button>
+                )}
+              </div>
+            ))}
+          </div>
+
+          <DialogFooter className="gap-2">
+            <Button
+              variant="outline"
+              onClick={cancelPendingUpload}
+              disabled={uploading}
+              size="lg"
+              className="rounded-xl"
+            >
+              취소
+            </Button>
+            <Button
+              onClick={confirmPhotoUpload}
+              disabled={uploading}
+              size="lg"
+              className="rounded-xl"
+            >
+              {uploading ? (
+                <>
+                  <Loader2 className="mr-1 h-4 w-4 animate-spin" /> 올리는 중…
+                </>
+              ) : (
+                `${pendingFiles.length}장 올리기`
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
