@@ -142,7 +142,7 @@ export default async function AdminDashboardPage() {
             {communities.map((c) => (
               <Link
                 key={c.id}
-                href={`/village/${c.id}`}
+                href={`/app/admin/communities/${c.id}`}
                 className="flex items-center gap-3 rounded-2xl border border-border bg-card p-3 transition-colors hover:bg-muted/40"
               >
                 <div className="min-w-0 flex-1">
