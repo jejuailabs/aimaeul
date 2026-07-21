@@ -2,13 +2,12 @@ import Link from 'next/link'
 import { MapPin, Sparkles, MessageCircle, Camera, Search } from 'lucide-react'
 import { AuthHeaderActions } from '@/components/auth-header-actions'
 import { GlobalFeed } from '@/components/global-feed'
-import { fetchGlobalFeed } from '@/lib/global-feed'
+import { getHomeData } from '@/lib/home-data'
 import { Button } from '@/components/ui/button'
 import { ThemeToggle } from '@/components/theme-toggle'
 import { KoreaVillageMap } from '@/components/korea-village-map'
 import { SearchBar } from '@/components/search-bar'
 import { getCurrentUser } from '@/lib/session'
-import { adminDb } from '@/lib/firebase-admin'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
@@ -17,44 +16,11 @@ export default async function Home() {
   // 05 문서: 지도는 로그인 여부와 무관하게 항상 접근 가능해야 한다.
   // 로그인 직후 라우팅(/onboarding, /app/chat)은 /login에서 처리하므로
   // 여기서 리다이렉트하면 "마을 지도" 링크가 원래 화면으로 튕겨 나온다.
-  const user = await getCurrentUser()
+  // 세션 조회와 공개 데이터 조회를 병렬로 돌린다.
+  // 순차로 두면 왕복 시간이 그대로 더해져 첫 화면이 몇 초씩 걸린다.
+  const [user, homeData] = await Promise.all([getCurrentUser(), getHomeData()])
 
-  // isPublic + createdAt 복합 인덱스를 요구하지 않도록 정렬은 메모리에서 처리한다.
-  // 공개 마을 수는 많지 않아 부담이 없다.
-  const commSnap = await adminDb
-    .collection('communities')
-    .where('isPublic', '==', true)
-    .get()
-
-  const commDocs = [...commSnap.docs].sort(
-    (a, b) => (a.data().createdAt?.toMillis?.() ?? 0) - (b.data().createdAt?.toMillis?.() ?? 0)
-  )
-
-  const feed = await fetchGlobalFeed(20)
-
-  const publicCommunities = await Promise.all(
-    commDocs.map(async (doc) => {
-      const c = doc.data()
-      const membersSnap = await adminDb
-        .collection('users')
-        .where('communityIds', 'array-contains', doc.id)
-        .count()
-        .get()
-      return {
-        id: doc.id,
-        name: c.name,
-        communityType: c.communityType,
-        regionName: c.regionName,
-        // Firestore에는 평평한 lat/lng로 저장된다.
-        // 중첩 location을 읽으면 항상 null이 되어 지도에 마커가 하나도 뜨지 않는다.
-        lat: c.lat ?? c.location?.lat ?? null,
-        lng: c.lng ?? c.location?.lng ?? null,
-        coverImageUrl: c.coverImageUrl ?? null,
-        description: c.description ?? null,
-        memberCount: membersSnap.data().count,
-      }
-    })
-  )
+  const { communities: publicCommunities, feed } = homeData
 
   return (
     <div className="flex min-h-screen flex-col">

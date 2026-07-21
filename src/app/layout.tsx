@@ -1,10 +1,12 @@
 import type { Metadata, Viewport } from "next";
+import { Suspense } from "react";
 import { Geist } from "next/font/google";
 import "./globals.css";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as SonnerToaster } from "@/components/ui/sonner";
 import { ThemeProvider } from "@/components/theme-provider";
 import { AuthProvider } from "@/lib/auth-context";
+import { NavProgress } from "@/components/nav-progress";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -59,6 +61,10 @@ export default function RootLayout({
           enableSystem
           disableTransitionOnChange
         >
+          {/* 모든 화면 전환에 즉시 반응을 주는 전역 표시기 */}
+          <Suspense fallback={null}>
+            <NavProgress />
+          </Suspense>
           <AuthProvider>
             {children}
           </AuthProvider>
