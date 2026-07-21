@@ -49,11 +49,13 @@ export default async function VillageHomePage({
   params: Promise<{ communityId: string }>
 }) {
   const { communityId } = await params
-  const commDoc = await adminDb.collection('communities').doc(communityId).get()
+  // 마을 문서와 세션은 서로 의존하지 않으므로 함께 가져온다.
+  const [commDoc, user] = await Promise.all([
+    adminDb.collection('communities').doc(communityId).get(),
+    getCurrentUser(),
+  ])
   if (!commDoc.exists) notFound()
   const community = commDoc.data()!
-
-  const user = await getCurrentUser()
   const isMember = user ? user.communities.some((c) => c.id === communityId) : false
 
   if (!community.isPublic && !isMember) {
@@ -86,26 +88,56 @@ export default async function VillageHomePage({
 
   const meta = communityTypeMeta(community.communityType)
 
-  const membersSnap = await adminDb
-    .collection('users')
-    .where('communityIds', 'array-contains', communityId)
-    .get()
+  const today = new Date().toISOString().slice(0, 10)
 
-  const photosSnap = await adminDb
-    .collection('communities')
-    .doc(communityId)
-    .collection('photos')
-    .orderBy('createdAt', 'desc')
-    .limit(12)
-    .get()
-
-  const messagesSnap = await adminDb
-    .collection('communities')
-    .doc(communityId)
-    .collection('messages')
-    .orderBy('createdAt', 'asc')
-    .limit(30)
-    .get()
+  // 아래 조회들은 서로 의존하지 않는다. 순차로 두면 왕복 시간이 그대로
+  // 더해져 마을 화면이 몇 초씩 걸린다.
+  const [
+    membersSnap,
+    photosSnap,
+    messagesSnap,
+    eventsSnap,
+    digestDoc,
+    vacantSnap,
+    historySnap,
+  ] = await Promise.all([
+    adminDb.collection('users').where('communityIds', 'array-contains', communityId).count().get(),
+    adminDb
+      .collection('communities')
+      .doc(communityId)
+      .collection('photos')
+      .orderBy('createdAt', 'desc')
+      .limit(12)
+      .get(),
+    adminDb
+      .collection('communities')
+      .doc(communityId)
+      .collection('messages')
+      .orderBy('createdAt', 'asc')
+      .limit(30)
+      .get(),
+    adminDb
+      .collection('events')
+      .where('communityId', '==', communityId)
+      .where('startAt', '>=', new Date())
+      .orderBy('startAt', 'asc')
+      .limit(4)
+      .get(),
+    adminDb.collection('dailyDigests').doc(`${communityId}_${today}`).get(),
+    // 개수만 필요하므로 문서를 모두 가져오지 않는다.
+    adminDb
+      .collection('vacantHouses')
+      .where('communityId', '==', communityId)
+      .where('status', '==', '게시중')
+      .count()
+      .get(),
+    adminDb
+      .collection('villageHistory')
+      .where('communityId', '==', communityId)
+      .orderBy('date', 'desc')
+      .limit(1)
+      .get(),
+  ])
 
   const photos = photosSnap.docs.map((d) => ({ id: d.id, ...d.data() })) as any[]
 
@@ -163,14 +195,6 @@ export default async function VillageHomePage({
     }
   })
 
-  const eventsSnap = await adminDb
-    .collection('events')
-    .where('communityId', '==', communityId)
-    .where('startAt', '>=', new Date())
-    .orderBy('startAt', 'asc')
-    .limit(4)
-    .get()
-
   const upcomingEvents = eventsSnap.docs.map((d) => ({ id: d.id, ...d.data() })) as any[]
 
   const gameResults = initialMessages
@@ -178,23 +202,8 @@ export default async function VillageHomePage({
     .slice(-3)
     .reverse()
 
-  const today = new Date().toISOString().slice(0, 10)
-  const digestDoc = await adminDb.collection('dailyDigests').doc(`${communityId}_${today}`).get()
   const todayDigest = digestDoc.exists ? digestDoc.data() : null
-
-  const vacantSnap = await adminDb
-    .collection('vacantHouses')
-    .where('communityId', '==', communityId)
-    .where('status', '==', '게시중')
-    .get()
-  const vacantCount = vacantSnap.size
-
-  const historySnap = await adminDb
-    .collection('villageHistory')
-    .where('communityId', '==', communityId)
-    .orderBy('date', 'desc')
-    .limit(1)
-    .get()
+  const vacantCount = vacantSnap.data().count
   const historyCount = historySnap.size
   const latestHistory = historySnap.empty ? null : historySnap.docs[0].data()
 
@@ -223,7 +232,7 @@ export default async function VillageHomePage({
             <div className="mb-1 flex items-center gap-2">
               <CommunityBadge type={community.communityType} size="sm" />
               <span className="inline-flex items-center gap-0.5 text-xs">
-                <Users className="h-3 w-3" /> {membersSnap.size}
+                <Users className="h-3 w-3" /> {membersSnap.data().count}
               </span>
             </div>
             <h1 className="text-2xl font-black leading-tight drop-shadow sm:text-3xl">{community.name}</h1>
