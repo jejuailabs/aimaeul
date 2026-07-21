@@ -32,7 +32,14 @@ type DiaryEntry = {
   text: string
   mood: string | null
   photoPaths: string[]
+  /** 음성 인식이 안 되는 기기에서 남긴 목소리 녹음. */
+  audioPath?: string | null
   createdAt: string | null
+}
+
+/** 일기 첨부 파일은 본인 확인을 거치는 이 경로로만 불러온다. */
+function diaryFileUrl(path: string) {
+  return `/api/diary/photo?path=${encodeURIComponent(path)}`
 }
 
 const MOODS = ['😊', '😌', '🥰', '😅', '😢', '😠', '🤒', '💪'] as const
@@ -170,7 +177,7 @@ function DiaryCard({ entry, onDelete }: { entry: DiaryEntry; onDelete: () => voi
             // eslint-disable-next-line @next/next/no-img-element
             <img
               key={p}
-              src={`/api/diary/photo?path=${encodeURIComponent(p)}`}
+              src={diaryFileUrl(p)}
               alt="일기 사진"
               loading="lazy"
               className={cn(
@@ -186,6 +193,15 @@ function DiaryCard({ entry, onDelete }: { entry: DiaryEntry; onDelete: () => voi
         <p className="whitespace-pre-line break-words px-4 py-3.5 text-[15px] leading-relaxed">
           {entry.text}
         </p>
+      )}
+
+      {entry.audioPath && (
+        <div className="px-4 pb-3.5">
+          <p className="mb-1.5 flex items-center gap-1.5 text-xs text-muted-foreground">
+            <Mic className="h-3.5 w-3.5" /> 내 목소리
+          </p>
+          <audio src={diaryFileUrl(entry.audioPath)} controls className="w-full" />
+        </div>
       )}
     </article>
   )
@@ -318,12 +334,56 @@ function WriteDialog({
   const recognitionRef = useRef<any>(null)
   const fileRef = useRef<HTMLInputElement>(null)
 
+  // 음성 인식이 안 되는 기기(특히 iOS)에서는 목소리를 그대로 녹음해 남긴다.
+  const [recording, setRecording] = useState(false)
+  const [audioBlob, setAudioBlob] = useState<Blob | null>(null)
+  const [audioUrl, setAudioUrl] = useState<string | null>(null)
+  const recorderRef = useRef<MediaRecorder | null>(null)
+  const chunksRef = useRef<BlobPart[]>([])
+
   useEffect(() => {
     const SR =
       typeof window !== 'undefined' &&
       ((window as any).SpeechRecognition || (window as any).webkitSpeechRecognition)
     setSpeechSupported(!!SR)
   }, [])
+
+  async function toggleRecord() {
+    if (recording) {
+      recorderRef.current?.stop()
+      return
+    }
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+      chunksRef.current = []
+      const rec = new MediaRecorder(stream)
+      rec.ondataavailable = (e) => {
+        if (e.data.size > 0) chunksRef.current.push(e.data)
+      }
+      rec.onstop = () => {
+        const blob = new Blob(chunksRef.current, { type: rec.mimeType || 'audio/webm' })
+        setAudioBlob(blob)
+        setAudioUrl((prev) => {
+          if (prev) URL.revokeObjectURL(prev)
+          return URL.createObjectURL(blob)
+        })
+        // 마이크 표시등이 계속 켜져 있지 않도록 트랙을 정리한다.
+        stream.getTracks().forEach((t) => t.stop())
+        setRecording(false)
+      }
+      recorderRef.current = rec
+      rec.start()
+      setRecording(true)
+    } catch {
+      toast.error('마이크를 사용할 수 없어요. 권한을 확인해주세요.')
+    }
+  }
+
+  function clearRecording() {
+    if (audioUrl) URL.revokeObjectURL(audioUrl)
+    setAudioUrl(null)
+    setAudioBlob(null)
+  }
 
   function toggleMic() {
     if (listening) {
@@ -383,6 +443,7 @@ function WriteDialog({
 
   function reset() {
     previews.forEach(URL.revokeObjectURL)
+    clearRecording()
     setText('')
     setMood(null)
     setDate(todayStr())
@@ -391,7 +452,7 @@ function WriteDialog({
   }
 
   async function save() {
-    if (!text.trim() && files.length === 0) {
+    if (!text.trim() && files.length === 0 && !audioBlob) {
       toast.error('내용이나 사진을 넣어주세요.')
       return
     }
@@ -402,6 +463,10 @@ function WriteDialog({
       fd.append('date', date)
       if (mood) fd.append('mood', mood)
       for (const f of files) fd.append('photos', f)
+      if (audioBlob) {
+        const ext = (audioBlob.type.split('/')[1] || 'webm').split(';')[0]
+        fd.append('audio', audioBlob, `voice.${ext}`)
+      }
 
       const res = await fetch('/api/diary', { method: 'POST', body: fd })
       const d = await res.json().catch(() => ({}))
@@ -415,6 +480,7 @@ function WriteDialog({
         text: d.text,
         mood: d.mood,
         photoPaths: d.photoPaths ?? [],
+        audioPath: d.audioPath ?? null,
         createdAt: new Date().toISOString(),
       })
       toast.success('일기를 저장했어요.')
@@ -507,6 +573,55 @@ function WriteDialog({
                 <span className="h-2 w-2 animate-pulse rounded-full bg-primary" />
                 듣고 있어요. 편하게 말씀하세요.
               </p>
+            )}
+          </div>
+
+          {/* 목소리 녹음 — 음성 인식이 안 되는 기기에서도 말로 남길 수 있다 */}
+          <div>
+            <label className="mb-1.5 block text-sm font-medium">
+              목소리로 남기기{' '}
+              <span className="font-normal text-muted-foreground">(선택)</span>
+            </label>
+
+            {!speechSupported && (
+              <p className="mb-1.5 text-xs text-muted-foreground">
+                이 기기는 말을 글로 바꾸는 기능을 지원하지 않아요. 목소리를 그대로 담아둘 수 있어요.
+              </p>
+            )}
+
+            {audioUrl ? (
+              <div className="flex items-center gap-2">
+                <audio src={audioUrl} controls className="flex-1" />
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  onClick={clearRecording}
+                  aria-label="녹음 지우기"
+                  className="shrink-0 rounded-full text-destructive"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              </div>
+            ) : (
+              <Button
+                type="button"
+                onClick={toggleRecord}
+                variant={recording ? 'default' : 'outline'}
+                size="lg"
+                className="w-full rounded-xl"
+              >
+                {recording ? (
+                  <>
+                    <span className="mr-2 h-2.5 w-2.5 animate-pulse rounded-full bg-current" />
+                    녹음 중… 눌러서 끝내기
+                  </>
+                ) : (
+                  <>
+                    <Mic className="mr-1.5 h-4 w-4" /> 목소리 녹음하기
+                  </>
+                )}
+              </Button>
             )}
           </div>
 

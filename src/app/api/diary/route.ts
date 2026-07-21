@@ -50,6 +50,7 @@ export async function GET(req: Request) {
         text: e.text ?? '',
         mood: e.mood ?? null,
         photoPaths: e.photoPaths ?? [],
+        audioPath: e.audioPath ?? null,
         createdAt: e.createdAt?.toDate?.()?.toISOString() ?? null,
       }
     }),
@@ -72,8 +73,10 @@ export async function POST(req: Request) {
   const mood = String(form.get('mood') ?? '').trim() || null
   const dateRaw = String(form.get('date') ?? '').trim()
   const files = form.getAll('photos').filter((f): f is File => f instanceof File)
+  const audio = form.get('audio')
+  const audioFile = audio instanceof File ? audio : null
 
-  if (!text && files.length === 0) {
+  if (!text && files.length === 0 && !audioFile) {
     return NextResponse.json({ error: '내용이나 사진을 넣어주세요.' }, { status: 400 })
   }
   if (files.length > MAX_PHOTOS) {
@@ -110,6 +113,19 @@ export async function POST(req: Request) {
     photoPaths.push(path)
   }
 
+  // 음성 인식이 안 되는 기기(특히 iOS)에서는 목소리를 그대로 남길 수 있게 한다.
+  let audioPath: string | null = null
+  if (audioFile) {
+    if (audioFile.size > MAX_BYTES) {
+      return NextResponse.json({ error: '녹음이 너무 길어요.' }, { status: 400 })
+    }
+    const buf = Buffer.from(await audioFile.arrayBuffer())
+    // 확장자는 브라우저가 준 MIME을 그대로 따른다(webm/mp4 등).
+    const ext = (audioFile.type.split('/')[1] || 'webm').split(';')[0]
+    audioPath = `diaries/${user.uid}/${id}/voice.${ext}`
+    await bucket.file(audioPath).save(buf, { contentType: audioFile.type || 'audio/webm' })
+  }
+
   await adminDb
     .collection('users')
     .doc(user.uid)
@@ -121,8 +137,9 @@ export async function POST(req: Request) {
       text,
       mood,
       photoPaths,
+      audioPath,
       createdAt: FieldValue.serverTimestamp(),
     })
 
-  return NextResponse.json({ ok: true, id, date, text, mood, photoPaths })
+  return NextResponse.json({ ok: true, id, date, text, mood, photoPaths, audioPath })
 }

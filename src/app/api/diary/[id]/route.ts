@@ -22,7 +22,11 @@ export async function DELETE(
     return NextResponse.json({ error: '일기를 찾을 수 없어요.' }, { status: 404 })
   }
 
-  const paths: string[] = doc.data()?.photoPaths ?? []
+  const data = doc.data() ?? {}
+  // 사진과 녹음 파일을 함께 정리한다.
+  const paths: string[] = [...(data.photoPaths ?? []), data.audioPath].filter(
+    (p): p is string => typeof p === 'string' && p.length > 0
+  )
   const bucket = adminStorage.bucket()
   await Promise.all(
     paths.map((p) =>
