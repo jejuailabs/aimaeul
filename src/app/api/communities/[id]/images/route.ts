@@ -6,7 +6,7 @@ import { adminDb, adminStorage } from '@/lib/firebase-admin'
 import { generateCommunityImage, type ImageKind } from '@/lib/image-gen'
 
 export const dynamic = 'force-dynamic'
-export const maxDuration = 60
+export const maxDuration = 120
 
 const MAX_BYTES = 20 * 1024 * 1024
 

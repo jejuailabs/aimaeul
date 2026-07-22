@@ -1,18 +1,11 @@
-import { GoogleAuth } from 'google-auth-library'
-
 /**
  * 마을 배너·마스코트 AI 생성.
  *
- * 이미 쓰고 있는 Firebase 서비스 계정으로 Vertex AI Imagen을 호출한다.
- * 새 API 키를 발급받을 필요가 없다.
- *
- * 단, Google Cloud 콘솔에서 Vertex AI API(aiplatform.googleapis.com)를
- * 켜고 결제를 연결해야 동작한다. 꺼져 있으면 403이 오므로,
- * 사용자에게 무엇을 해야 하는지 그대로 알려준다.
+ * OpenAI 이미지 생성 API를 쓴다(.env.local의 OPENAI_* 설정).
+ * 모델·품질은 환경변수로 바꿀 수 있다.
  */
 
-const LOCATION = 'us-central1'
-const MODEL = 'imagen-3.0-fast-generate-001'
+const OPENAI_IMAGE_URL = 'https://api.openai.com/v1/images/generations'
 
 export type ImageKind = 'banner' | 'mascot'
 
@@ -60,56 +53,60 @@ export async function generateCommunityImage(
   community: { name: string; communityType: string; regionName: string },
   userPrompt?: string
 ): Promise<GenerateResult> {
-  const projectId = process.env.FIREBASE_PROJECT_ID
-  const clientEmail = process.env.FIREBASE_CLIENT_EMAIL
-  const privateKey = process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n')
-
-  if (!projectId || !clientEmail || !privateKey) {
-    return { ok: false, error: '서버 설정이 완료되지 않았어요.' }
+  const apiKey = process.env.OPENAI_API_KEY
+  if (!apiKey) {
+    return {
+      ok: false,
+      needsSetup: true,
+      error: 'AI 그림 생성 키가 설정되지 않았어요. OPENAI_API_KEY를 추가해주세요.',
+    }
   }
 
+  const model = process.env.OPENAI_IMAGE_MODEL || 'gpt-image-1'
+  const quality = process.env.OPENAI_IMAGE_QUALITY || 'medium'
+  // 배너는 가로로 넓게, 마스코트는 정사각으로.
+  const size = kind === 'banner' ? '1536x1024' : '1024x1024'
+
   try {
-    const auth = new GoogleAuth({
-      credentials: { client_email: clientEmail, private_key: privateKey },
-      projectId,
-      scopes: ['https://www.googleapis.com/auth/cloud-platform'],
-    })
-    const client = await auth.getClient()
-    const { token } = await client.getAccessToken()
-
-    const url =
-      `https://${LOCATION}-aiplatform.googleapis.com/v1/projects/${projectId}` +
-      `/locations/${LOCATION}/publishers/google/models/${MODEL}:predict`
-
-    const res = await fetch(url, {
+    const res = await fetch(OPENAI_IMAGE_URL, {
       method: 'POST',
-      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        instances: [{ prompt: buildPrompt(kind, community, userPrompt) }],
-        parameters: {
-          sampleCount: 1,
-          aspectRatio: kind === 'banner' ? '16:9' : '1:1',
-        },
+        model,
+        prompt: buildPrompt(kind, community, userPrompt),
+        size,
+        quality,
       }),
     })
 
     if (!res.ok) {
       const text = await res.text()
-      console.error('[image-gen] Vertex AI 오류:', res.status, text.slice(0, 300))
+      console.error('[image-gen] OpenAI 오류:', res.status, text.slice(0, 300))
 
-      if (res.status === 403 && text.includes('has not been used in project')) {
+      if (res.status === 401) {
+        return {
+          ok: false,
+          needsSetup: true,
+          error: 'AI 그림 생성 키가 올바르지 않아요. OPENAI_API_KEY를 확인해주세요.',
+        }
+      }
+      if (res.status === 429) {
+        return { ok: false, error: 'AI 그림 생성 요청이 많아요. 잠시 후 다시 시도해주세요.' }
+      }
+      // 조직 미인증 등으로 gpt-image 계열이 막힌 경우
+      if (text.includes('must be verified') || text.includes('not have access')) {
         return {
           ok: false,
           needsSetup: true,
           error:
-            'AI 그림 생성이 아직 켜져 있지 않아요. Google Cloud 콘솔에서 Vertex AI API를 켜면 바로 쓸 수 있어요.',
+            'AI 그림 생성 모델에 접근 권한이 없어요. OpenAI 계정에서 조직 인증이 필요할 수 있어요.',
         }
       }
       return { ok: false, error: 'AI 그림을 만들지 못했어요. 잠시 후 다시 시도해주세요.' }
     }
 
     const data = await res.json()
-    const b64 = data.predictions?.[0]?.bytesBase64Encoded
+    const b64 = data.data?.[0]?.b64_json
     if (!b64) {
       return { ok: false, error: 'AI가 그림을 만들지 못했어요. 설명을 바꿔 다시 시도해보세요.' }
     }
