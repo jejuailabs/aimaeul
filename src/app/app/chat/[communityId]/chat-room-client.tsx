@@ -32,6 +32,7 @@ import { MessageBubble, type PhotoData } from '@/components/message-bubble'
 import { communityTypeMeta, formatKoreanTime } from '@/lib/village'
 import { cn } from '@/lib/utils'
 import { GamesClient } from '@/app/app/games/games-client'
+import { AddToHomeScreen } from '@/components/add-to-home-screen'
 import { collection, limit, onSnapshot, orderBy, query } from 'firebase/firestore'
 import { firestore } from '@/lib/firebase'
 import { toast } from 'sonner'
@@ -267,11 +268,8 @@ export function ChatRoomClient({
             </p>
           </div>
         </Link>
-        <Button asChild variant="ghost" size="icon" className="rounded-full">
-          <Link href={`/village/${community.id}`} aria-label="마을 홈">
-            <span className="text-base">{meta.emoji}</span>
-          </Link>
-        </Button>
+        {/* 바탕화면에 바로가기 만들기 — 마스코트 아이콘 + 마을 이름으로 생성 */}
+        <AddToHomeScreen communityName={community.name} />
       </header>
 
       {/* Messages */}

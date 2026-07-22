@@ -339,12 +339,8 @@ export default async function MemberHomePage({
           </section>
         )}
 
-        <Link
-          href="/onboarding"
-          className="mt-6 flex items-center justify-center gap-2 rounded-2xl border border-dashed border-border py-3 text-xs text-muted-foreground transition-colors hover:bg-muted/40"
-        >
-          <Plus className="h-4 w-4" /> 새 마을 참여하기
-        </Link>
+        {/* "새 마을 참여하기"는 마을홈에 있을 자리가 아니다.
+            상단 마을 전환 칩과 내 정보에서 이미 다룬다. */}
       </div>
     </AppShell>
   )

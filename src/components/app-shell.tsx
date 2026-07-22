@@ -43,16 +43,17 @@ export function AppShell({
           {!title && <div className="flex-1" />}
           {/* 슈퍼관리자만 보이며, 탭 한 번으로 회장/회원 시점 전환 */}
           <ViewModeBadge />
-          {/* 앱 어디서든 지도(메인)로 나갈 수 있어야 한다 */}
+          {/* 앱 어디서든 지도(메인)로 나갈 수 있어야 한다.
+              아이콘만 두면 다른 아이콘들과 섞여 알아보기 어려워 글자를 함께 둔다. */}
           <Button
             asChild
-            variant="ghost"
-            size="icon"
-            className="shrink-0 rounded-full"
-            aria-label="마을 지도로"
+            variant="outline"
+            size="sm"
+            className="shrink-0 rounded-full px-2.5"
           >
-            <Link href="/">
-              <Map className="h-5 w-5" />
+            <Link href="/" aria-label="마을 지도로 나가기">
+              <Map className="mr-1 h-4 w-4" />
+              <span className="text-xs font-medium">지도</span>
             </Link>
           </Button>
           {right}

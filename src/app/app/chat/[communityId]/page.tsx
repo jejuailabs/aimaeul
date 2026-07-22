@@ -4,8 +4,37 @@ import { adminDb } from '@/lib/firebase-admin'
 import { FieldValue } from 'firebase-admin/firestore'
 import { ChatRoomClient } from './chat-room-client'
 import type { PhotoData } from '@/components/message-bubble'
+import type { Metadata } from 'next'
 
 export const dynamic = 'force-dynamic'
+
+/**
+ * 마을별 매니페스트·아이콘을 연결한다.
+ * 바탕화면에 바로가기를 만들면 마을 이름과 마스코트로 생성된다.
+ */
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ communityId: string }>
+}): Promise<Metadata> {
+  const { communityId } = await params
+  const doc = await adminDb.collection('communities').doc(communityId).get()
+  const name = doc.exists ? (doc.data()!.name ?? '마을') : '마을'
+
+  return {
+    title: `${name} — 우리마을`,
+    manifest: `/api/communities/${communityId}/manifest`,
+    appleWebApp: {
+      capable: true,
+      title: name,
+      statusBarStyle: 'default',
+    },
+    icons: {
+      apple: `/api/communities/${communityId}/icon?size=192`,
+      icon: `/api/communities/${communityId}/icon?size=192`,
+    },
+  }
+}
 
 export default async function ChatRoomPage({
   params,
