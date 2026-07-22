@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
-import { Calendar, Camera, ChevronRight, Gamepad2, MapPin, MessageCircle, Sparkles, Users, Building2, Plus } from 'lucide-react'
+import { Calendar, Camera, ChevronRight, Gamepad2, MapPin, MessageCircle, Sparkles, Users } from 'lucide-react'
 import { getCurrentUser } from '@/lib/session'
 import { adminDb } from '@/lib/firebase-admin'
 import { AppShell } from '@/components/app-shell'
@@ -134,63 +134,67 @@ export default async function MemberHomePage({
           </div>
         )}
 
-        {/* Community card */}
+        {/* 히어로 — 배너를 배경으로, 마스코트는 프로필처럼 원형으로 겹친다.
+            배너가 없으면 공동체 색 그라데이션으로 대체해 흰 사각형이 생기지 않게 한다. */}
         <div className="relative overflow-hidden rounded-3xl">
-          {community.coverImageUrl ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={community.coverImageUrl} alt={community.name} className="h-36 w-full object-cover" />
-          ) : (
-            <div className="flex h-36 items-center justify-center bg-muted text-5xl">{meta.emoji}</div>
-          )}
-          <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent" />
-          {/* 마스코트가 있으면 배너 위에 함께 보여준다 */}
-          {community.mascotImageUrl && (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={community.mascotImageUrl}
-              alt={`${community.name} 마스코트`}
-              className="absolute bottom-2 right-3 h-24 w-24 object-contain drop-shadow-lg"
-            />
-          )}
-          <div className="absolute inset-x-0 bottom-0 p-3 text-white">
-            <div className="mb-1 flex items-center gap-2">
-              <CommunityBadge type={community.communityType} size="sm" />
-              <span className="inline-flex items-center gap-0.5 text-xs">
-                <Users className="h-3 w-3" /> {communityCount.members}
-              </span>
+          <div className="h-40 w-full">
+            {community.coverImageUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={community.coverImageUrl} alt={community.name} className="h-full w-full object-cover" />
+            ) : (
+              <div
+                className="h-full w-full"
+                style={{ background: `linear-gradient(135deg, ${meta.color}cc, ${meta.color}66)` }}
+              />
+            )}
+          </div>
+          <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/20 to-transparent" />
+
+          <div className="absolute inset-x-0 bottom-0 flex items-end gap-3 p-4 text-white">
+            {/* 마스코트(없으면 이모지)를 원형 프로필로 */}
+            <div
+              className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-full border-2 border-white/80 bg-white/90 text-3xl shadow-lg"
+            >
+              {community.mascotImageUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={community.mascotImageUrl}
+                  alt={`${community.name} 마스코트`}
+                  className="h-full w-full object-cover"
+                />
+              ) : (
+                meta.emoji
+              )}
             </div>
-            <h2 className="text-lg font-black">{community.name}</h2>
-            <p className="flex items-center gap-1 text-[11px]">
-              <MapPin className="h-3 w-3" /> {community.regionName}
-            </p>
+            <div className="min-w-0 flex-1 pb-0.5">
+              <div className="mb-0.5 flex items-center gap-2">
+                <CommunityBadge type={community.communityType} size="sm" />
+                <span className="inline-flex items-center gap-0.5 text-xs text-white/90">
+                  <Users className="h-3 w-3" /> {communityCount.members}
+                </span>
+              </div>
+              <h2 className="truncate text-xl font-black leading-tight">{community.name}</h2>
+              <p className="flex items-center gap-1 text-[11px] text-white/85">
+                <MapPin className="h-3 w-3 shrink-0" /> {community.regionName}
+              </p>
+            </div>
           </div>
         </div>
 
-        {/* 바로가기 — 사진과 홈페이지는 이 화면에 합쳐서 따로 두지 않는다 */}
-        <div className="mt-3 grid grid-cols-3 gap-2">
-          {[
-            { href: `/app/chat/${activeId}`, icon: MessageCircle, label: '채팅' },
-            { href: `/village/${activeId}/timeline`, icon: Camera, label: '타임라인' },
-            { href: `/village/${activeId}/history`, icon: Building2, label: '마을 역사' },
-          ].map((a) => (
-            <Link
-              key={a.href}
-              href={a.href}
-              className="flex flex-col items-center gap-1 rounded-2xl border border-border bg-card py-3 text-xs transition-colors hover:bg-muted/40"
-            >
-              <div className="flex h-9 w-9 items-center justify-center rounded-full bg-primary/15">
-                <a.icon className="h-4 w-4 text-primary-foreground/70" />
-              </div>
-              {a.label}
-            </Link>
-          ))}
-        </div>
+        {/* 주 행동 — 채팅이 가장 크게. 나머지는 아래 통합 흐름과 겹치지 않는 것만. */}
+        <Link
+          href={`/app/chat/${activeId}`}
+          className="mt-4 flex items-center justify-center gap-2 rounded-2xl bg-primary py-3.5 font-bold text-primary-foreground shadow-sm transition-transform active:scale-[0.99]"
+        >
+          <MessageCircle className="h-5 w-5" /> 채팅방 들어가기
+        </Link>
 
         {/* 오늘의 마을 소식 (AI 신문) — 마을 홈페이지에 있던 내용을 합쳤다 */}
+        {/* ① 오늘의 마을 소식 (AI 신문) */}
         {todayDigest && (
           <Link
             href={`/village/${activeId}/news/${todayDigest.date}`}
-            className="mt-3 block rounded-2xl border border-primary/40 bg-primary/5 p-3 transition-colors hover:bg-primary/10"
+            className="mt-4 block rounded-2xl border border-primary/40 bg-primary/5 p-3 transition-colors hover:bg-primary/10"
           >
             <p className="flex items-center gap-1.5 text-sm font-semibold">
               <Sparkles className="h-4 w-4 text-primary" /> 오늘의 마을 소식
@@ -201,43 +205,7 @@ export default async function MemberHomePage({
           </Link>
         )}
 
-        {/* 마을 역사 */}
-        {latestHistory && (
-          <Link
-            href={`/village/${activeId}/history`}
-            className="mt-2 flex items-center gap-3 rounded-2xl border border-border bg-card p-3 transition-colors hover:bg-muted/40"
-          >
-            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary/15 text-base">
-              📜
-            </div>
-            <div className="min-w-0 flex-1">
-              <p className="text-sm font-semibold">마을 역사</p>
-              <p className="truncate text-xs text-muted-foreground">
-                {latestHistory.title ?? latestHistory.summary ?? '기록을 확인해보세요'}
-              </p>
-            </div>
-            <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
-          </Link>
-        )}
-
-        {/* 빈집소개 */}
-        {vacantCount > 0 && (
-          <Link
-            href={`/village/${activeId}/vacant-houses`}
-            className="mt-2 flex items-center gap-3 rounded-2xl border border-border bg-card p-3 transition-colors hover:bg-muted/40"
-          >
-            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary/15 text-base">
-              🏠
-            </div>
-            <div className="min-w-0 flex-1">
-              <p className="text-sm font-semibold">우리동네 빈집소개</p>
-              <p className="text-xs text-muted-foreground">{vacantCount}곳</p>
-            </div>
-            <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
-          </Link>
-        )}
-
-        {/* Upcoming events */}
+        {/* ② 다가오는 행사 */}
         {upcomingEvents.length > 0 && (
           <section className="mt-5">
             <div className="mb-2 flex items-center justify-between">
@@ -339,9 +307,66 @@ export default async function MemberHomePage({
           </section>
         )}
 
-        {/* "새 마을 참여하기"는 마을홈에 있을 자리가 아니다.
-            상단 마을 전환 칩과 내 정보에서 이미 다룬다. */}
+        {/* ③ 마을 더보기 — 자주 안 쓰는 기록성 메뉴를 한 카드로 묶는다. */}
+        <section className="mt-5">
+          <h3 className="mb-2 text-sm font-bold">마을 더보기</h3>
+          <div className="divide-y divide-border overflow-hidden rounded-2xl border border-border bg-card">
+            <MoreLink
+              href={`/village/${activeId}/timeline`}
+              emoji="🗓"
+              title="타임라인"
+              desc="날짜별 마을 활동 모아보기"
+            />
+            <MoreLink
+              href={`/village/${activeId}/history`}
+              emoji="📜"
+              title="마을 역사"
+              desc={
+                latestHistory
+                  ? (latestHistory.title ?? latestHistory.summary ?? 'AI가 기록한 마을 이야기')
+                  : 'AI가 기록한 마을 이야기'
+              }
+            />
+            {vacantCount > 0 && (
+              <MoreLink
+                href={`/village/${activeId}/vacant-houses`}
+                emoji="🏠"
+                title="우리동네 빈집소개"
+                desc={`${vacantCount}곳`}
+              />
+            )}
+          </div>
+        </section>
       </div>
     </AppShell>
+  )
+}
+
+/** 마을 더보기 안의 링크 한 줄 */
+function MoreLink({
+  href,
+  emoji,
+  title,
+  desc,
+}: {
+  href: string
+  emoji: string
+  title: string
+  desc: string
+}) {
+  return (
+    <Link
+      href={href}
+      className="flex items-center gap-3 p-3 transition-colors hover:bg-muted/40"
+    >
+      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary/15 text-base">
+        {emoji}
+      </div>
+      <div className="min-w-0 flex-1">
+        <p className="text-sm font-semibold">{title}</p>
+        <p className="truncate text-xs text-muted-foreground">{desc}</p>
+      </div>
+      <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
+    </Link>
   )
 }

@@ -51,28 +51,25 @@ export function BottomTabBar() {
   const pathname = usePathname()
   const chatActive = pathname?.startsWith('/app/chat')
 
+  // 사이드 탭의 활성 표시는 "색 + 굵기"로만 한다.
+  // 노란 배경을 주면 중앙 채팅의 노란 원과 겹쳐, 뭐가 현재 화면인지 헷갈린다.
   const sideTab = (tab: (typeof SIDE_TABS)[keyof typeof SIDE_TABS]) => {
     const active = pathname === tab.href || pathname?.startsWith(tab.href)
     return (
       <Link
         href={tab.href}
+        aria-current={active ? 'page' : undefined}
         className={cn(
-          'flex min-h-[56px] flex-1 flex-col items-center justify-center gap-0.5 py-1.5 text-[11px] transition-colors',
-          active ? 'text-foreground' : 'text-muted-foreground hover:text-foreground'
+          'relative flex min-h-[56px] flex-1 flex-col items-center justify-center gap-0.5 py-1.5 text-[11px] transition-colors',
+          active ? 'text-primary' : 'text-muted-foreground hover:text-foreground'
         )}
       >
-        <div
-          className={cn(
-            'flex h-7 w-12 items-center justify-center rounded-full transition-colors',
-            active && 'bg-primary'
-          )}
-        >
-          <TabIcon
-            Icon={tab.icon}
-            className={cn('h-5 w-5', active && 'text-primary-foreground')}
-          />
-        </div>
-        <span className={cn(active && 'font-semibold')}>{tab.label}</span>
+        {/* 현재 화면 표시는 상단 짧은 바로 */}
+        {active && (
+          <span className="absolute top-0 h-0.5 w-8 rounded-full bg-primary" />
+        )}
+        <TabIcon Icon={tab.icon} className="h-6 w-6" />
+        <span className={cn(active && 'font-bold')}>{tab.label}</span>
       </Link>
     )
   }
@@ -85,16 +82,18 @@ export function BottomTabBar() {
       <div className="mx-auto flex max-w-2xl items-end justify-around px-2">
         {sideTab(SIDE_TABS.left)}
 
-        {/* 정중앙 채팅 — 가장 많이 누르는 곳이라 크게 띄운다 */}
+        {/* 정중앙 채팅 — 가장 많이 누르는 곳이라 크게 띄운다.
+            현재 채팅 화면이면 링을 둘러 "여기 있음"을 표시한다. */}
         <Link
           href="/app/chat"
           aria-label="채팅"
-          className="flex flex-1 flex-col items-center justify-end gap-0.5 py-1.5"
+          aria-current={chatActive ? 'page' : undefined}
+          className="relative flex flex-1 flex-col items-center justify-end gap-0.5 py-1.5"
         >
           <div
             className={cn(
-              'flex h-14 w-14 -translate-y-2 items-center justify-center rounded-full shadow-lg transition-transform active:scale-95',
-              chatActive ? 'bg-primary' : 'bg-primary/90'
+              'flex h-14 w-14 -translate-y-2 items-center justify-center rounded-full bg-primary shadow-lg transition-transform active:scale-95',
+              chatActive && 'ring-4 ring-primary/30'
             )}
           >
             <ChatCenterIcon />
@@ -102,7 +101,7 @@ export function BottomTabBar() {
           <span
             className={cn(
               '-mt-1 text-[12px]',
-              chatActive ? 'font-bold text-foreground' : 'font-semibold text-muted-foreground'
+              chatActive ? 'font-bold text-primary' : 'font-semibold text-muted-foreground'
             )}
           >
             채팅
