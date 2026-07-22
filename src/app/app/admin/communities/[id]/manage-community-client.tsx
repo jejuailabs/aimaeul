@@ -45,6 +45,8 @@ type Community = {
   inviteCode: string
   coverImageUrl: string | null
   mascotImageUrl: string | null
+  bannerGallery: string[]
+  mascotGallery: string[]
 }
 
 const TABS = [
@@ -177,11 +179,13 @@ export function ManageCommunityClient({
           communityId={community.id}
           kind="banner"
           initialUrl={community.coverImageUrl}
+          initialGallery={community.bannerGallery}
         />
         <CommunityImageEditor
           communityId={community.id}
           kind="mascot"
           initialUrl={community.mascotImageUrl}
+          initialGallery={community.mascotGallery}
         />
       </div>
 

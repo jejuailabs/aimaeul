@@ -3,6 +3,7 @@ import sharp from 'sharp'
 import { randomUUID } from 'crypto'
 import { getCurrentUser } from '@/lib/session'
 import { adminDb, adminStorage } from '@/lib/firebase-admin'
+import { FieldValue } from 'firebase-admin/firestore'
 import { generateCommunityImage, type ImageKind } from '@/lib/image-gen'
 
 export const dynamic = 'force-dynamic'
@@ -114,20 +115,65 @@ export async function POST(
 
   const url = `https://storage.googleapis.com/${bucket.name}/${objectPath}`
   const field = kind === 'banner' ? 'coverImageUrl' : 'mascotImageUrl'
+  const galleryField = kind === 'banner' ? 'bannerGallery' : 'mascotGallery'
 
-  // 예전 파일 정리 (실패해도 진행)
-  const prevUrl: string | undefined = community[field]
-  if (prevUrl?.includes(`/communities/${id}/`)) {
-    const prevPath = prevUrl.split(`${bucket.name}/`)[1]
-    if (prevPath) await bucket.file(prevPath).delete().catch(() => {})
-  }
-
-  await commRef.update({ [field]: url })
+  // 예전 이미지를 지우지 않고 갤러리에 쌓는다. 나중에 다시 고를 수 있게.
+  await commRef.update({
+    [field]: url,
+    [galleryField]: FieldValue.arrayUnion(url),
+  })
 
   return NextResponse.json({ ok: true, kind, url })
 }
 
-/** 배너·마스코트 제거 */
+/**
+ * 갤러리에서 다른 이미지를 현재 배너·마스코트로 고른다.
+ * body: { kind, url } — url은 반드시 그 마을 갤러리에 있는 것이어야 한다.
+ */
+export async function PATCH(
+  req: Request,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const user = await getCurrentUser()
+  if (!user) {
+    return NextResponse.json({ error: '로그인이 필요합니다.' }, { status: 401 })
+  }
+  const { id } = await params
+  if (!canManage(user, id)) {
+    return NextResponse.json({ error: '권한이 없습니다.' }, { status: 403 })
+  }
+
+  const { kind, url } = (await req.json().catch(() => ({}))) as {
+    kind?: string
+    url?: string
+  }
+  if ((kind !== 'banner' && kind !== 'mascot') || !url) {
+    return NextResponse.json({ error: '잘못된 요청입니다.' }, { status: 400 })
+  }
+
+  const commRef = adminDb.collection('communities').doc(id)
+  const doc = await commRef.get()
+  if (!doc.exists) {
+    return NextResponse.json({ error: '마을을 찾을 수 없어요.' }, { status: 404 })
+  }
+
+  const galleryField = kind === 'banner' ? 'bannerGallery' : 'mascotGallery'
+  const gallery: string[] = doc.data()![galleryField] ?? []
+  // 남의 URL을 활성 이미지로 밀어 넣지 못하게 갤러리 안의 것만 허용한다.
+  if (!gallery.includes(url)) {
+    return NextResponse.json({ error: '갤러리에 없는 이미지예요.' }, { status: 400 })
+  }
+
+  const field = kind === 'banner' ? 'coverImageUrl' : 'mascotImageUrl'
+  await commRef.update({ [field]: url })
+  return NextResponse.json({ ok: true, kind, url })
+}
+
+/**
+ * 이미지 제거.
+ * - url이 있으면 갤러리에서 그 이미지 하나만 지운다(파일도 삭제).
+ * - url이 없으면 현재 활성 이미지를 비우기만 한다(갤러리는 유지).
+ */
 export async function DELETE(
   req: Request,
   { params }: { params: Promise<{ id: string }> }
@@ -141,7 +187,9 @@ export async function DELETE(
     return NextResponse.json({ error: '권한이 없습니다.' }, { status: 403 })
   }
 
-  const kind = new URL(req.url).searchParams.get('kind')
+  const sp = new URL(req.url).searchParams
+  const kind = sp.get('kind')
+  const targetUrl = sp.get('url')
   if (kind !== 'banner' && kind !== 'mascot') {
     return NextResponse.json({ error: '잘못된 요청입니다.' }, { status: 400 })
   }
@@ -151,15 +199,34 @@ export async function DELETE(
   if (!doc.exists) {
     return NextResponse.json({ error: '마을을 찾을 수 없어요.' }, { status: 404 })
   }
-
+  const data = doc.data()!
   const field = kind === 'banner' ? 'coverImageUrl' : 'mascotImageUrl'
-  const url: string | undefined = doc.data()![field]
+  const galleryField = kind === 'banner' ? 'bannerGallery' : 'mascotGallery'
   const bucket = adminStorage.bucket()
-  if (url?.includes(`/communities/${id}/`)) {
-    const objectPath = url.split(`${bucket.name}/`)[1]
-    if (objectPath) await bucket.file(objectPath).delete().catch(() => {})
+
+  if (targetUrl) {
+    // 갤러리에서 한 장만 삭제
+    const gallery: string[] = data[galleryField] ?? []
+    if (!gallery.includes(targetUrl)) {
+      return NextResponse.json({ error: '갤러리에 없는 이미지예요.' }, { status: 400 })
+    }
+    if (targetUrl.includes(`/communities/${id}/`)) {
+      const objectPath = targetUrl.split(`${bucket.name}/`)[1]
+      if (objectPath) await bucket.file(objectPath).delete().catch(() => {})
+    }
+    const update: Record<string, unknown> = {
+      [galleryField]: FieldValue.arrayRemove(targetUrl),
+    }
+    // 지운 이미지가 현재 활성이면 남은 것 중 최신으로 대체(없으면 비움).
+    if (data[field] === targetUrl) {
+      const remaining = gallery.filter((u) => u !== targetUrl)
+      update[field] = remaining.length > 0 ? remaining[remaining.length - 1] : null
+    }
+    await commRef.update(update)
+    return NextResponse.json({ ok: true, activeUrl: update[field] ?? data[field] })
   }
 
+  // 현재 활성 이미지만 비운다 (갤러리 보존)
   await commRef.update({ [field]: null })
-  return NextResponse.json({ ok: true })
+  return NextResponse.json({ ok: true, activeUrl: null })
 }
